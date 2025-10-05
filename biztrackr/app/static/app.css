@@ -1,0 +1,14 @@
+/* Minimal extras on top of Tailwind */
+canvas { max-height: 360px; }
+/* Compact form spacing */
+.form-compact { --field-gap: .25rem; }
+.form-compact .grid { gap: var(--field-gap); }
+.form-compact label { margin-bottom: .125rem; display:block; }
+.form-compact input, .form-compact select, .form-compact textarea { font-size: .875rem; padding-top:.375rem; padding-bottom:.375rem; }
+.form-compact button { padding-top: .375rem; padding-bottom: .375rem; }
+/* Reduce overall card width */
+.max-w-lg { max-width: 36rem; }
+.form-compact .text-sm, .form-compact input, .form-compact select, .form-compact textarea { font-size: .875rem; }
+.form-compact .grid { gap: var(--field-gap); }
+.form-compact label { margin-bottom: .125rem; display:block; }
+.form-compact button { padding-top: .375rem; padding-bottom: .375rem; }

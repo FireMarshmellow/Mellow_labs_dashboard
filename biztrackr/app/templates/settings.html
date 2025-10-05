@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Settings</h1>
+<form method="post" action="/settings" enctype="multipart/form-data" class="p-4 rounded-2xl bg-slate-800 grid gap-4 max-w-lg">
+  <div>
+    <label class="text-xs text-slate-300">Company Name</label>
+    <input name="company_name" value="{{ s.company_name if s else '' }}" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm"/>
+  </div>
+  <div class="grid grid-cols-3 gap-4">
+    <div>
+      <label class="text-xs text-slate-300">YouTube Subs</label>
+      <input type="number" name="youtube_subs" value="{{ s.youtube_subs if s else '' }}" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm"/>
+    </div>
+    <div>
+      <label class="text-xs text-slate-300">Instagram</label>
+      <input type="number" name="instagram_followers" value="{{ s.instagram_followers if s else '' }}" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm"/>
+    </div>
+    <div>
+      <label class="text-xs text-slate-300">TikTok</label>
+      <input type="number" name="tiktok_followers" value="{{ s.tiktok_followers if s else '' }}" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm"/>
+    </div>
+  </div>
+  <div>
+    <label class="text-xs text-slate-300">Logo (PNG/JPG)</label>
+    <input type="file" name="logo" accept="image/*" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm"/>
+  </div>
+  <button class="mt-2 py-2 rounded bg-blue-600 hover:bg-blue-500">Save</button>
+</form>
+{% endblock %}
