@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Income — Simple Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="dark light" />
+  <style>
+    :root { color-scheme: dark; }
+    html { overflow-y: scroll; }
+    .truncate-26ch { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+    
+    /* Ensure dropdown options are visible */
+    select option {
+      background-color: #1e293b;
+      color: #e2e8f0;
+    }
+
+    .transition-all { transition: all 0.2s ease-in-out; }
+    
+    input, select, textarea {
+      transition: all 0.2s ease;
+      border: 1px solid transparent;
+      background: rgba(10,14,20,0.6);
+    }
+    
+    input:hover, select:hover, textarea:hover {
+      border-color: rgba(148, 163, 184, 0.2);
+    }
+    
+    input:focus, select:focus, textarea:focus {
+      border-color: #3b82f6;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+
+    tr:hover:not(:first-child) {
+      background-color: rgba(148, 163, 184, 0.05);
+    }
+
+    .button-hover {
+      transition: all 0.2s ease;
+      transform: translateY(0);
+    }
+    
+    .button-hover:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-hover {
+      transition: all 0.3s ease;
+    }
+    
+    .card-hover:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(148, 163, 184, 0.1);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.3);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.4);
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen">
+  <main class="max-w-6xl mx-auto p-6 space-y-8">
+    <header class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover mb-6">
+      <div class="flex items-center gap-3">
+        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h1 class="text-3xl font-bold bg-gradient-to-r from-green-500 to-green-300 bg-clip-text text-transparent">Income</h1>
+      </div>
+      <div class="flex gap-3">
+        <button id="btnExport" class="button-hover text-sm px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+          </svg>
+          Export CSV
+        </button>
+        <label class="button-hover text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 cursor-pointer flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+          </svg>
+          Import CSV<input id="fileImport" type="file" accept=".csv,text/csv" class="hidden" />
+        </label>
+        <button id="btnClear" class="button-hover text-sm px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+          Clear All
+        </button>
+      </div>
+    </header>
+
+    <section class="p-6 rounded-2xl bg-slate-800/90 max-w-3xl shadow-lg backdrop-blur-sm card-hover mx-auto">
+      <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
+        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        New Income Entry
+      </h2>
+      <form id="form" class="grid gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <label for="date" class="text-xs text-slate-300">Date</label>
+            <input id="date" type="date" required class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
+          </div>
+          
+          <div>
+            <label class="text-xs text-slate-300">Source</label>
+            <select id="source" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm">
+              <option value="Patreon">Patreon</option>
+              <option value="Sponsorship">Sponsorship</option>
+              <option value="Twitch">Twitch</option>
+              <option value="YouTube AdSense">YouTube AdSense</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-xs text-slate-300">Payment Processor</label>
+            <select id="processor" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm">
+              <option value="Bank">Bank</option>
+              <option value="PayPal">PayPal</option>
+              <option value="Payoneer">Payoneer</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="amount" class="text-xs text-slate-300">Amount (£)</label>
+            <input id="amount" type="number" step="0.01" min="0" required class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
+          </div>
+
+          <div>
+            <label for="fees" class="text-xs text-slate-300">Fees (£)</label>
+            <input id="fees" type="number" step="0.01" min="0" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
+          </div>
+
+          <div>
+            <label for="notes" class="text-xs text-slate-300">Notes</label>
+            <textarea id="notes" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" rows="2"></textarea>
+          </div>
+
+          <div class="flex items-end">
+            <button type="submit" class="w-full py-2 rounded-lg bg-green-600 hover:bg-green-500 text-sm button-hover">Add Income</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="p-6 rounded-2xl bg-slate-800/90 shadow-lg backdrop-blur-sm card-hover max-w-[1160px] mx-auto">
+      <div class="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-6">
+        <div class="flex items-center gap-4">
+          <div class="bg-slate-700/50 rounded-lg p-3 text-center">
+            <div class="text-xs text-slate-400 mb-1">Entries</div>
+            <div class="text-xl font-semibold text-blue-400" id="count">0</div>
+          </div>
+          <div class="bg-slate-700/50 rounded-lg p-3 text-center">
+            <div class="text-xs text-slate-400 mb-1">Total Income</div>
+            <div class="text-xl font-semibold text-green-400" id="sum">£0.00</div>
+          </div>
+        </div>
+        <div class="flex gap-4 text-sm">
+          <label class="flex items-center gap-2 bg-slate-700/30 rounded-lg px-4 py-2">
+            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input id="filter" placeholder="Filter income..." class="bg-transparent border-none focus:ring-0 px-2 py-1 w-48" />
+          </label>
+          <label class="flex items-center gap-2 bg-slate-700/30 rounded-lg px-4 py-2">
+            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
+            </svg>
+            <select id="sortBy" class="bg-transparent border-none focus:ring-0 px-2 py-1 text-slate-200">
+              <option value="date desc">Latest First</option>
+              <option value="date asc">Oldest First</option>
+              <option value="amount desc">Highest Amount</option>
+              <option value="amount asc">Lowest Amount</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-slate-400 border-b border-slate-700/50">
+              <th class="py-4 px-3 font-medium whitespace-nowrap w-[100px]">Date</th>
+              <th class="py-4 px-3 font-medium whitespace-nowrap w-[140px]">Source</th>
+              <th class="py-4 px-3 font-medium whitespace-nowrap w-[140px]">Processor</th>
+              <th class="py-4 px-3 font-medium text-right whitespace-nowrap w-[100px]">Amount</th>
+              <th class="py-4 px-3 font-medium text-right whitespace-nowrap w-[100px]">Fees</th>
+              <th class="py-4 px-3 font-medium whitespace-nowrap w-[200px]">Notes</th>
+              <th class="py-4 px-3 font-medium text-right whitespace-nowrap w-[140px]">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <template id="rowTpl">
+    <tr class="border-t border-slate-700/50 transition-colors">
+      <td class="py-4 px-3 whitespace-nowrap" data-k="date"></td>
+      <td class="px-3"><span class="px-2 py-1 rounded-full text-xs bg-blue-900/30 text-blue-300 inline-block max-w-[110px] truncate" data-k="source"></span></td>
+      <td class="px-3"><span class="px-2 py-1 rounded-full text-xs bg-slate-700/50 inline-block max-w-[110px] truncate" data-k="processor"></span></td>
+      <td class="text-right px-3 font-medium whitespace-nowrap text-green-400" data-k="amountFmt"></td>
+      <td class="text-right px-3 font-medium whitespace-nowrap text-rose-400" data-k="feesFmt"></td>
+      <td class="px-3 truncate-26ch" title="" data-k="notes"></td>
+      <td class="text-right px-3 whitespace-nowrap">
+        <button class="button-hover text-xs px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-1 inline-flex" data-act="edit">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+          </svg>
+          Edit
+        </button>
+        <button class="button-hover text-xs px-3 py-1 rounded-lg bg-rose-700 hover:bg-rose-600 ml-2 flex items-center gap-1 inline-flex" data-act="del">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+          Delete
+        </button>
+      </td>
+    </tr>
+  </template>
+
+  <script>
+    const LS_KEY = 'income.simple.v1';
+    const gbp = new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'});
+    let DATA = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+
+    const form = document.getElementById('form');
+    const tbody = document.getElementById('tbody');
+    const countEl = document.getElementById('count');
+    const filter = document.getElementById('filter');
+    const sortBy = document.getElementById('sortBy');
+
+    // Elements
+    const dateEl = document.getElementById('date');
+    const sourceEl = document.getElementById('source');
+    const processorEl = document.getElementById('processor');
+  const amountEl = document.getElementById('amount');
+  const feesEl = document.getElementById('fees');
+  const notesEl = document.getElementById('notes');
+
+    // Prefill date
+    dateEl.valueAsDate = new Date();
+
+    function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36)}
+
+    function sanitizeCSV(s){ if (s==null) return ''; const str=String(s); return /[",\n]/.test(str)? '"'+str.replaceAll('"','""')+'"': str; }
+  function toCSV(rows){ const header=['Date','Source','Processor','AmountGBP','FeesGBP','Notes']; const lines=[header.join(',')]; for(const r of rows) lines.push([sanitizeCSV(r.date),sanitizeCSV(r.source),sanitizeCSV(r.processor),(Number(r.amount)||0).toFixed(2),(Number(r.fees)||0).toFixed(2),sanitizeCSV(r.notes||'')].join(',')); return lines.join('\n'); }
+  function parseCSV(text){ const rows=[]; let i=0,field='',row=[],inQuotes=false; while(i<text.length){ const ch=text[i++]; if(inQuotes){ if(ch==='"'){ if(text[i]==='"'){ field+="\""; i++; } else inQuotes=false; } else field+=ch; } else { if(ch==='"') inQuotes=true; else if(ch===','){ row.push(field); field=''; } else if(ch==='\n' || ch==='\r'){ if(field!==''||row.length){ row.push(field); rows.push(row); row=[]; field=''; } } else field+=ch; } } if(field!==''||row.length){ row.push(field); rows.push(row);} return rows.filter(r=>r.length>1); }
+  function csvToRows(csvText){ const rows=parseCSV(csvText); if(!rows.length) return []; const header=rows[0].map(h=>h.trim().toLowerCase()); const idx={date:header.indexOf('date'), source:header.indexOf('source'), processor:header.indexOf('processor'), amount:header.findIndex(h=>h.includes('amount')), fees:header.findIndex(h=>h.startsWith('fee')), notes:header.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; if(!row[idx.date]) continue; out.push({ id:uid(), date: row[idx.date]||'', source: row[idx.source]||'', processor: row[idx.processor]||'', amount: Number(String(row[idx.amount]||'0').replace(/[^0-9.\-]/g,''))||0, fees: Number(String(row[idx.fees]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[idx.notes]||'' }); } return out; }
+
+    function save(){ localStorage.setItem(LS_KEY, JSON.stringify(DATA)); }
+
+  function render() {
+    const q = filter.value.trim().toLowerCase();
+    const [key, dir] = sortBy.value.split(' ');
+    
+    // Filter
+    let rows = DATA.filter(r => !q || [r.date, r.source, r.processor, r.notes, (r.amount||0), (r.fees||0)].join(' ').toLowerCase().includes(q));
+    
+    // Sort
+    rows.sort((a,b) => {
+      if (key === 'date') {
+        return (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) * (dir === 'asc' ? 1 : -1);
+      }
+      if (key === 'amount') {
+        const amountA = Number(a.amount) || 0;
+        const amountB = Number(b.amount) || 0;
+        return (amountA - amountB) * (dir === 'asc' ? 1 : -1);
+      }
+      return 0;
+    });
+
+    // Update stats
+    count.textContent = String(rows.length);
+    const totalIncome = rows.reduce((acc, r) => acc + (Number(r.amount)||0), 0);
+    sum.textContent = gbp.format(totalIncome);
+    
+    // Render table
+    tbody.innerHTML = '';
+    const tpl = document.getElementById('rowTpl');
+    
+    for (const r of rows) {
+      const tr = tpl.content.firstElementChild.cloneNode(true);
+      tr.querySelector('[data-k=date]').textContent = r.date || '';
+      tr.querySelector('[data-k=source]').textContent = r.source || '';
+      tr.querySelector('[data-k=processor]').textContent = r.processor || '';
+      tr.querySelector('[data-k=amountFmt]').textContent = gbp.format(Number(r.amount)||0);
+      tr.querySelector('[data-k=feesFmt]').textContent = gbp.format(Number(r.fees)||0);
+      const notesEl = tr.querySelector('[data-k=notes]');
+      notesEl.textContent = r.notes || '';
+      notesEl.title = r.notes || '';
+      tr.dataset.id = r.id;
+      tbody.appendChild(tr);
+    }
+  }
+
+    // Custom selects
+    sourceEl.addEventListener('change', ()=>{ if(sourceEl.value==='Custom'){ const v=prompt('Enter custom source (e.g. BuyMeACoffee)'); if(v){ const opt=document.createElement('option'); opt.value=v; opt.textContent=v; sourceEl.appendChild(opt); sourceEl.value=v; } else { sourceEl.value='Patreon'; } } });
+    processorEl.addEventListener('change', ()=>{ if(processorEl.value==='Custom'){ const v=prompt('Enter custom processor (e.g. PayPal)'); if(v){ const opt=document.createElement('option'); opt.value=v; opt.textContent=v; processorEl.appendChild(opt); processorEl.value=v; } else { processorEl.value='Bank'; } } });
+
+    form.addEventListener('submit',(e)=>{ e.preventDefault(); const rec={ id:uid(), date: dateEl.value, source: sourceEl.value, processor: processorEl.value, amount: Number(amountEl.value)||0, fees: Number(feesEl.value)||0, notes: notesEl.value.trim() }; if(!rec.date) return; DATA.push(rec); save(); render(); form.reset(); dateEl.valueAsDate=new Date(); sourceEl.value='Patreon'; processorEl.value='Bank'; notesEl.focus(); // auto-download CSV
+      const csv=toCSV(DATA); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`income-${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    });
+
+  tbody.addEventListener('click',(e)=>{ const btn=e.target.closest('button'); if(!btn) return; const tr=btn.closest('tr'); const id=tr?.dataset?.id; const idx=DATA.findIndex(x=>x.id===id); if(idx===-1) return; const rec=DATA[idx]; if(btn.dataset.act==='del'){ if(confirm('Delete this row?')){ DATA.splice(idx,1); save(); render(); } } else if(btn.dataset.act==='edit'){ const date=prompt('Date (YYYY-MM-DD):', rec.date)||rec.date; const source=prompt('Source:', rec.source)||rec.source; const processor=prompt('Processor:', rec.processor)||rec.processor; const amount=Number(prompt('Amount (£):', rec.amount))||rec.amount; const fees=Number(prompt('Fees (£):', rec.fees))||rec.fees; const notes=prompt('Notes:', rec.notes)||rec.notes; Object.assign(rec,{date,source,processor,amount,fees,notes}); save(); render(); } });
+
+    // CSV export/import
+    document.getElementById('btnExport').addEventListener('click', ()=>{ const csv=toCSV(DATA); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`income-${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); });
+  document.getElementById('fileImport').addEventListener('change',(e)=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ const items=csvToRows(String(r.result||'')); if(!items.length){ alert('No rows found'); return; } const keyOf = x=>[x.date,x.source,Number(x.amount||0).toFixed(2)].join('|'); const exist=new Set(DATA.map(keyOf)); let added=0; for(const it of items){ if(!exist.has(keyOf(it))){ DATA.push(it); added++; } } save(); render(); alert(`Imported ${added} new row(s)`); }; r.readAsText(f); e.target.value=''; });
+    document.getElementById('btnClear').addEventListener('click',()=>{ if(!confirm('Clear all income data?')) return; DATA=[]; save(); render(); });
+
+    // Add event listeners for sort and filter
+    sortBy.addEventListener('change', render);
+    filter.addEventListener('input', render);
+
+    // init
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Financial Summary</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+  <meta name="color-scheme" content="dark light" />
+  <style>
+    :root { color-scheme: dark; }
+    html { overflow-y: scroll; }
+
+    .transition-all { transition: all 0.2s ease-in-out; }
+
+    input, select { transition: all 0.2s ease; border: 1px solid transparent; background: rgba(10,14,20,0.6); }
+    input:hover, select:hover { border-color: rgba(148, 163, 184, 0.2); }
+    input:focus, select:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+
+    .button-hover { transition: all 0.2s ease; transform: translateY(0); }
+    .button-hover:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(148, 163, 184, 0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.4); }
+
+    .chart-container { position: relative; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(6px); border-radius: 12px; padding: 1rem; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen">
+  <main class="max-w-7xl mx-auto p-6 space-y-8">
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+      <div class="flex items-center gap-3">
+        <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+        <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-500 to-purple-300 bg-clip-text text-transparent">Financial Summary</h1>
+      </div>
+      <div class="flex gap-3">
+        <div class="flex items-center gap-4">
+          <label class="button-hover text-sm px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 cursor-pointer flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            Import Income<input id="incomeImport" type="file" accept=".csv" class="hidden" />
+          </label>
+          <label class="button-hover text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 cursor-pointer flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            Import Expenses<input id="expensesImport" type="file" accept=".csv" class="hidden" />
+          </label>
+        </div>
+      </div>
+    </header>
+
+    <!-- Date Range Selector -->
+    <section class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+      <div class="flex flex-wrap gap-4 items-end">
+        <div>
+          <label class="text-xs text-slate-300 block mb-1">Start Date</label>
+          <input type="date" id="startDate" class="px-3 py-2 rounded-lg text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-slate-300 block mb-1">End Date</label>
+          <input type="date" id="endDate" class="px-3 py-2 rounded-lg text-sm" />
+        </div>
+        <div>
+          <label class="text-xs text-slate-300 block mb-1">Quick Select</label>
+          <select id="quickSelect" class="px-3 py-2 rounded-lg text-sm w-40 text-slate-2 00">
+            <option value="7d">Last 7 Days</option>
+            <option value="1m">Last Month</option>
+            <option value="3m">Last 3 Months</option>
+            <option value="6m">Last 6 Months</option>
+            <option value="1y">Last Year</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+        <button id="updateCharts" class="button-hover px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm">Update Charts</button>
+      </div>
+    </section>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+        <h3 class="text-sm text-slate-400 mb-1">Total Income</h3>
+        <div class="text-2xl font-bold text-green-400" id="totalIncome">£0.00</div>
+      </div>
+      <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+        <h3 class="text-sm text-slate-400 mb-1">Total Expenses</h3>
+        <div class="text-2xl font-bold text-rose-400" id="totalExpenses">£0.00</div>
+      </div>
+      <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+        <h3 class="text-sm text-slate-400 mb-1">Net Income</h3>
+        <div class="text-2xl font-bold text-blue-400" id="netIncome">£0.00</div>
+      </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="chart-container"><canvas id="timelineChart"></canvas></div>
+      <div class="chart-container"><canvas id="incomePieChart"></canvas></div>
+      <div class="chart-container"><canvas id="expensesPieChart"></canvas></div>
+      <div class="chart-container"><canvas id="paymentMethodsChart"></canvas></div>
+    </div>
+
+    <!-- Income Table -->
+    <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-green-400">Income Transactions</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead class="text-xs uppercase bg-slate-700/50">
+            <tr>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="income-date">Date ↕</th>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="income-source">Source</th>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="income-processor">Payment Method</th>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50 text-right" data-sort="income-amount">Amount ↕</th>
+            </tr>
+          </thead>
+          <tbody id="incomeTable" class="divide-y divide-slate-700/30"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Expenses Table (UPDATED) -->
+    <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover mt-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-rose-400">Expense Transactions</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead class="text-xs uppercase bg-slate-700/50">
+            <tr>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="expense-date">Date ↕</th>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="expense-platform">Platform</th>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50 text-right" data-sort="expense-price">Price ↕</th>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="expense-item">Item</th>
+            </tr>
+          </thead>
+          <tbody id="expensesTable" class="divide-y divide-slate-700/30"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+
+    let incomeData = [];
+    let expensesData = [];
+
+    let timelineChart = null;
+    let incomePieChart = null;
+    let expensesPieChart = null;
+    let paymentMethodsChart = null;
+
+    const colors = {
+      income: 'rgba(34, 197, 94, 0.2)',
+      incomeBorder: 'rgb(34, 197, 94)',
+      expenses: 'rgba(239, 68, 68, 0.2)',
+      expensesBorder: 'rgb(239, 68, 68)',
+      pieColors: [
+        'rgba(59, 130, 246, 0.6)',
+        'rgba(99, 102, 241, 0.6)',
+        'rgba(168, 85, 247, 0.6)',
+        'rgba(236, 72, 153, 0.6)',
+        'rgba(248, 113, 113, 0.6)',
+        'rgba(234, 179, 8, 0.6)',
+        'rgba(34, 197, 94, 0.6)',
+        'rgba(20, 184, 166, 0.6)'
+      ]
+    };
+
+    function parseCSV(text) {
+      const lines = text.split(/\r?\n/);
+      const rows = [];
+      for (let line of lines) {
+        if (!line.trim()) continue;
+        const row = []; let field = ''; let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (inQuotes) {
+            if (ch === '"') {
+              if (line[i+1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+            } else { field += ch; }
+          } else {
+            if (ch === '"') inQuotes = true; else if (ch === ',') { row.push(field.trim()); field = ''; } else { field += ch; }
+          }
+        }
+        row.push(field.trim());
+        while (row.length && row[row.length-1] === '') row.pop();
+        if (row.filter(f => f !== '').length > 1) rows.push(row);
+      }
+      return rows;
+    }
+
+    function processIncomeCSV(csvText) {
+      const rows = parseCSV(csvText);
+      if (rows.length < 2) return [];
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const dateIdx = header.indexOf('date');
+      const sourceIdx = header.indexOf('source');
+      const processorIdx = header.indexOf('processor');
+      let amountIdx = header.findIndex(h => h.includes('amountgbp'));
+      let feesIdx = header.findIndex(h => h.includes('feesgbp'));
+      if (amountIdx === -1) amountIdx = header.findIndex(h => h.includes('amount'));
+      if (feesIdx === -1) feesIdx = header.findIndex(h => h.includes('fees'));
+      return rows.slice(1).map(r => {
+        const d = (r[dateIdx]||'').trim();
+        let parsed = luxon.DateTime.fromFormat(d, 'dd/MM/yyyy');
+        if (!parsed.isValid) parsed = luxon.DateTime.fromFormat(d, 'dd-MM-yyyy');
+        const dateISO = parsed.isValid ? parsed.toISODate() : '';
+        const amount = Number(String(r[amountIdx]||'0').replace(/[^0-9.-]/g, '')) || 0;
+        const fees = Number(String(r[feesIdx]||'0').replace(/[^0-9.-]/g, '')) || 0;
+        return { date: dateISO, source: r[sourceIdx]||'', processor: r[processorIdx]||'', amount: amount - fees };
+      });
+    }
+
+    // UPDATED: parse Platform and Item name for expenses
+    function processExpensesCSV(csvText) {
+      const rows = parseCSV(csvText);
+      if (rows.length < 2) return [];
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const dateIdx = header.indexOf('date');
+      const sourceIdx = header.indexOf('source'); // e.g., AliExpress, Amazon
+      const sellerIdx = header.indexOf('seller'); // fallback when source missing
+      let itemIdx = header.indexOf('item(s)');
+      if (itemIdx === -1) itemIdx = header.findIndex(h => h === 'item' || h.includes('item'));
+      let amountIdx = header.findIndex(h => h === 'totalgbp' || h.includes('amountgbp') || h === 'amount');
+      if (amountIdx === -1) amountIdx = header.findIndex(h => h.includes('total') || h.includes('amount'));
+      const categoryIdx = header.indexOf('category'); // optional fallback for item name
+
+      return rows.slice(1).map(r => {
+        const d = (r[dateIdx]||'').trim();
+        let parsed = luxon.DateTime.fromFormat(d, 'dd/MM/yyyy');
+        if (!parsed.isValid) parsed = luxon.DateTime.fromFormat(d, 'dd-MM-yyyy');
+        const dateISO = parsed.isValid ? parsed.toISODate() : '';
+        const price = Number(String(r[amountIdx]||'0').replace(/[^0-9.-]/g, '')) || 0;
+        const platform = (r[sourceIdx] && r[sourceIdx].trim()) ? r[sourceIdx].trim() : (r[sellerIdx]||'').trim();
+        const item = (r[itemIdx] && r[itemIdx].trim()) ? r[itemIdx].trim() : ((categoryIdx !== -1 && r[categoryIdx]) ? r[categoryIdx].trim() : '');
+        return { date: dateISO, platform, price, item };
+      });
+    }
+
+    function filterDataByDateRange(data, startDate, endDate) {
+      return data.filter(it => {
+        const d = new Date(it.date);
+        return (!isNaN(d)) && d >= startDate && d <= endDate;
+      });
+    }
+
+    function initCharts() {
+      const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+      timelineChart = new Chart(timelineCtx, {
+        type: 'line',
+        data: { datasets: [
+          { label: 'Income', borderColor: colors.incomeBorder, backgroundColor: colors.income, fill: true },
+          { label: 'Expenses', borderColor: colors.expensesBorder, backgroundColor: colors.expenses, fill: true }
+        ]},
+        options: { responsive: true, scales: { x: { type: 'time', time: { unit: 'month' } }, y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'Income vs Expenses Over Time', color: '#e2e8f0', font: { size: 16 } } } }
+      });
+
+      const incomeSourcesCtx = document.getElementById('incomePieChart').getContext('2d');
+      incomePieChart = new Chart(incomeSourcesCtx, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Income Sources', color: '#e2e8f0', font: { size: 16 }}}}});
+
+      const expenseCategoriesCtx = document.getElementById('expensesPieChart').getContext('2d');
+      expensesPieChart = new Chart(expenseCategoriesCtx, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Expense Categories', color: '#e2e8f0', font: { size: 16 }}}}});
+
+      const paymentMethodsCtx = document.getElementById('paymentMethodsChart').getContext('2d');
+      paymentMethodsChart = new Chart(paymentMethodsCtx, { type: 'bar', data: { labels: [], datasets: [{ label: 'Transactions', data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Platforms / Methods', color: '#e2e8f0', font: { size: 16 }}}, scales: { y: { beginAtZero: true } } }});
+    }
+
+    function updateCharts() {
+      const startDate = new Date(document.getElementById('startDate').value);
+      const endDate = new Date(document.getElementById('endDate').value);
+      const inc = filterDataByDateRange(incomeData, startDate, endDate);
+      const exp = filterDataByDateRange(expensesData, startDate, endDate);
+
+      const totalInc = inc.reduce((s,i)=>s+i.amount,0);
+      const totalExp = exp.reduce((s,i)=>s+i.price,0);
+      const net = totalInc - totalExp;
+      document.getElementById('totalIncome').textContent = gbp.format(totalInc);
+      document.getElementById('totalExpenses').textContent = gbp.format(totalExp);
+      const netEl = document.getElementById('netIncome');
+      netEl.textContent = gbp.format(net);
+      netEl.className = 'text-2xl font-bold ' + (net >= 0 ? 'text-green-400' : 'text-rose-400');
+
+      const timelineData = {};
+      inc.forEach(i=>{ const d=i.date; (timelineData[d] ||= {income:0, expenses:0}).income += i.amount; });
+      exp.forEach(e=>{ const d=e.date; (timelineData[d] ||= {income:0, expenses:0}).expenses += e.price; });
+      const dates = Object.keys(timelineData).sort();
+      timelineChart.data.labels = dates;
+      timelineChart.data.datasets[0].data = dates.map(d=>timelineData[d].income);
+      timelineChart.data.datasets[1].data = dates.map(d=>timelineData[d].expenses);
+      timelineChart.update();
+
+      const incomeSources = {};
+      inc.forEach(i=>{ incomeSources[i.source] = (incomeSources[i.source]||0) + i.amount; });
+      incomePieChart.data.labels = Object.keys(incomeSources);
+      incomePieChart.data.datasets[0].data = Object.values(incomeSources);
+      incomePieChart.update();
+
+      const expensePlatforms = {};
+      exp.forEach(e=>{ const key = e.platform || 'Unknown'; expensePlatforms[key] = (expensePlatforms[key]||0) + e.price; });
+      expensesPieChart.data.labels = Object.keys(expensePlatforms);
+      expensesPieChart.data.datasets[0].data = Object.values(expensePlatforms);
+      expensesPieChart.update();
+
+      const methods = {};
+      inc.forEach(i=>{ if (i.processor) methods[i.processor] = (methods[i.processor]||0)+1; });
+      exp.forEach(e=>{ if (e.platform) methods[e.platform] = (methods[e.platform]||0)+1; });
+      paymentMethodsChart.data.labels = Object.keys(methods);
+      paymentMethodsChart.data.datasets[0].data = Object.values(methods);
+      paymentMethodsChart.update();
+    }
+
+    function setQuickSelectDates(value) {
+      const end = new Date(); let start = new Date();
+      switch(value){
+        case '7d': start.setDate(end.getDate()-7); break;
+        case '1m': start.setMonth(end.getMonth()-1); break;
+        case '3m': start.setMonth(end.getMonth()-3); break;
+        case '6m': start.setMonth(end.getMonth()-6); break;
+        case '1y': start.setFullYear(end.getFullYear()-1); break;
+        case 'all':
+          const allDates = [ ...incomeData.map(i=>new Date(i.date)), ...expensesData.map(e=>new Date(e.date))].filter(d=>!isNaN(d));
+          start = allDates.length ? new Date(Math.min(...allDates)) : new Date();
+          break;
+      }
+      document.getElementById('startDate').valueAsDate = start;
+      document.getElementById('endDate').valueAsDate = end;
+    }
+
+    function showAlert(msg){ alert(msg); }
+
+    document.getElementById('incomeImport').addEventListener('change', e => {
+      const file = e.target.files[0]; if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.csv')) { showAlert('Please select a CSV file'); e.target.value=''; return; }
+      const reader = new FileReader();
+      reader.onload = () => { incomeData = processIncomeCSV(reader.result); showAlert(`Imported ${incomeData.length} income records`); updateCharts(); updateTables(); };
+      reader.readAsText(file); e.target.value='';
+    });
+
+    document.getElementById('expensesImport').addEventListener('change', e => {
+      const file = e.target.files[0]; if (!file) return;
+      if (!file.name.toLowerCase().endsWith('.csv')) { showAlert('Please select a CSV file'); e.target.value=''; return; }
+      const reader = new FileReader();
+      reader.onload = () => { expensesData = processExpensesCSV(reader.result); showAlert(`Imported ${expensesData.length} expense records`); updateCharts(); updateTables(); };
+      reader.readAsText(file); e.target.value='';
+    });
+
+    document.getElementById('quickSelect').addEventListener('change', e => { setQuickSelectDates(e.target.value); updateCharts(); updateTables(); });
+    document.getElementById('updateCharts').addEventListener('click', () => { updateCharts(); updateTables(); });
+
+    // TABLES & SORTING
+    let incomeSortField = 'income-date';
+    let incomeSortDirection = 'desc';
+    let expenseSortField = 'expense-date';
+    let expenseSortDirection = 'desc';
+
+    function updateTables(){
+      const startDate = new Date(document.getElementById('startDate').value);
+      const endDate = new Date(document.getElementById('endDate').value);
+      const inc = filterDataByDateRange(incomeData, startDate, endDate);
+      const exp = filterDataByDateRange(expensesData, startDate, endDate);
+
+      inc.sort((a,b)=>{ let c=0; const f = incomeSortField.replace('income-','');
+        switch(f){ case 'date': c=new Date(a.date)-new Date(b.date); break; case 'amount': c=a.amount-b.amount; break; case 'source': c=a.source.localeCompare(b.source); break; case 'processor': c=(a.processor||'').localeCompare(b.processor||''); break; }
+        return incomeSortDirection==='asc'?c:-c; });
+
+      exp.sort((a,b)=>{ let c=0; const f = expenseSortField.replace('expense-','');
+        switch(f){ case 'date': c=new Date(a.date)-new Date(b.date); break; case 'price': c=a.price-b.price; break; case 'platform': c=(a.platform||'').localeCompare(b.platform||''); break; case 'item': c=(a.item||'').localeCompare(b.item||''); break; }
+        return expenseSortDirection==='asc'?c:-c; });
+
+      const incomeTable = document.getElementById('incomeTable');
+      incomeTable.innerHTML = inc.map(i=>`
+        <tr class="hover:bg-slate-700/30 transition-colors">
+          <td class="px-4 py-2">${i.date}</td>
+          <td class="px-4 py-2">${i.source}</td>
+          <td class="px-4 py-2">${i.processor || 'N/A'}</td>
+          <td class="px-4 py-2 text-right text-green-400">${gbp.format(i.amount)}</td>
+        </tr>
+      `).join('');
+
+      const expensesTable = document.getElementById('expensesTable');
+      expensesTable.innerHTML = exp.map(e=>`
+        <tr class="hover:bg-slate-700/30 transition-colors">
+          <td class="px-4 py-2">${e.date}</td>
+          <td class="px-4 py-2">${e.platform || 'N/A'}</td>
+          <td class="px-4 py-2 text-right text-rose-400">${gbp.format(e.price)}</td>
+          <td class="px-4 py-2">${e.item || 'N/A'}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.querySelectorAll('th[data-sort]').forEach(th=>{
+      th.addEventListener('click',()=>{
+        const field = th.dataset.sort;
+        if (field.startsWith('income-')) {
+          if (field === incomeSortField) { incomeSortDirection = incomeSortDirection==='asc'?'desc':'asc'; }
+          else { incomeSortField = field; incomeSortDirection = 'desc'; }
+        } else {
+          if (field === expenseSortField) { expenseSortDirection = expenseSortDirection==='asc'?'desc':'asc'; }
+          else { expenseSortField = field; expenseSortDirection = 'desc'; }
+        }
+        document.querySelectorAll('th[data-sort]').forEach(h=>{ h.textContent = h.textContent.replace(' ↑','').replace(' ↓',''); });
+        const dir = (field.startsWith('income-') ? incomeSortDirection : expenseSortDirection) === 'asc' ? ' ↑' : ' ↓';
+        th.textContent += dir;
+        updateTables();
+      });
+    });
+
+    // INIT
+    function bootstrap(){ initCharts(); setQuickSelectDates('1m'); updateCharts(); updateTables(); }
+    bootstrap();
+  </script>
+</body>
+</html>
