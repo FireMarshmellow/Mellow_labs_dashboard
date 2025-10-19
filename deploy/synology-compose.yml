@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  mellow-labs-dashboard:
+    image: ${IMAGE}
+    container_name: mellow-labs-dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_PATH=/data/finance.db
+      - APP_VERSION=${APP_VERSION:-latest}
+    volumes:
+      - ${HOST_DATA_PATH:-./data}:/data
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --label-enable --cleanup --interval 900
+    restart: unless-stopped

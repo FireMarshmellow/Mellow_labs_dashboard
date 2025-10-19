@@ -4,6 +4,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+const APP_VERSION = process.env.APP_VERSION || 'dev';
 const ROOT = __dirname;
 const DB_PATH = path.join(ROOT, 'finance.db');
 
@@ -371,6 +372,10 @@ const server = http.createServer(async (req, res) => {
         return [key, count];
       }));
       return sendJson(res, 200, { ok: true, counts });
+    }
+
+    if (pathname === '/api/version') {
+      return sendJson(res, 200, { version: APP_VERSION });
     }
 
     const csvMatch = pathname.match(/^\/api\/(income|expenses|payroll)\.csv$/);

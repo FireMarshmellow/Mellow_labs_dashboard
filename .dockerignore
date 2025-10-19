@@ -1,0 +1,26 @@
+# Git and VCS
+.git
+.gitignore
+
+# Python venv and caches
+.venv
+__pycache__
+*.pyc
+*.pyo
+
+# OS/filesystem noise
+.DS_Store
+Thumbs.db
+
+# Local databases and artifacts (we will mount a volume for persistence)
+finance.db
+*.sqlite
+*.sqlite3
+
+# Node-related (if experimenting)
+node_modules
+npm-debug.log*
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+

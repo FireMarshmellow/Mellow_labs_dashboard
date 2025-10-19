@@ -38,6 +38,7 @@
     <section class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover space-y-4">
       <div class="flex flex-wrap items-center gap-4 text-sm text-slate-300">
         <span>Status: <span id="apiStatus" class="text-amber-300">Checking...</span></span>
+        <span>Version: <span id="appVersion" class="text-slate-300">Loading...</span></span>
       </div>
     </section>
 
@@ -98,6 +99,18 @@
   <script>
     function updateStatus(connected){ const el=document.getElementById('apiStatus'); if(!el) return; el.textContent = connected?'Connected':'Offline'; el.className = connected?'text-green-400':'text-rose-400'; }
     async function ensureAPI(){ try{ if(!window.API) return false; const ok = API.available || await API.init(''); updateStatus(ok); return ok; } catch { updateStatus(false); return false; } }
+    async function showVersion(){
+      const el = document.getElementById('appVersion'); if(!el) return;
+      try {
+        const r = await fetch('/api/version');
+        if (r.ok) { const j = await r.json(); el.textContent = j.version || 'dev'; return; }
+      } catch {}
+      try {
+        const r2 = await fetch('/version.json');
+        if (r2.ok) { const j = await r2.json(); el.textContent = j.version || 'dev'; return; }
+      } catch {}
+      el.textContent = 'dev';
+    }
     function downloadBlob(blob, filename){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); }
 
     function parseCSV(text){ const rows=[]; let i=0,field='',row=[],inQ=false; while(i<text.length){ const ch=text[i++]; if(inQ){ if(ch==='"'){ if(text[i]==='"'){ field+='"'; i++; } else inQ=false; } else field+=ch; } else { if(ch==='"') inQ=true; else if(ch===','){ row.push(field); field=''; } else if(ch==='\n'||ch==='\r'){ if(field!==''||row.length){ row.push(field); rows.push(row); row=[]; field=''; } } else field+=ch; } } if(field!==''||row.length){ row.push(field); rows.push(row);} return rows.filter(r=>r.length>1);}    
@@ -116,7 +129,7 @@
     document.getElementById('btnExportExpenses').addEventListener('click', async ()=>{ if(!(await ensureAPI())) return alert('Backend offline'); const blob = await API.expenses.export(); downloadBlob(blob, `expenses-${new Date().toISOString().slice(0,10)}.csv`); });
     document.getElementById('btnExportPayroll').addEventListener('click', async ()=>{ if(!(await ensureAPI())) return alert('Backend offline'); const blob = await API.payroll.export(); downloadBlob(blob, `payroll-${new Date().toISOString().slice(0,10)}.csv`); });
 
-    (async ()=>{ await ensureAPI(); })();
+    (async ()=>{ showVersion(); await ensureAPI(); })();
   </script>
 </body>
 </html>

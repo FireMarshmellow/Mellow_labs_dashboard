@@ -8,7 +8,8 @@ from uuid import uuid4
 from flask import Flask, jsonify, request, send_from_directory, g, Response
 
 ROOT = Path(__file__).resolve().parent
-DB_PATH = ROOT / "finance.db"
+# Allow overriding DB path via env for Docker persistence
+DB_PATH = Path(os.environ.get("DATABASE_PATH") or (ROOT / "finance.db"))
 
 app = Flask(__name__)
 
@@ -255,6 +256,12 @@ def export_csv(kind: str) -> str:
     for record in records:
         writer.writerow(config["csv_row"](record))
     return output.getvalue()
+
+
+@app.route("/api/version")
+def version():
+    ver = os.environ.get("APP_VERSION", "dev")
+    return jsonify({"version": ver})
 
 
 @app.after_request
