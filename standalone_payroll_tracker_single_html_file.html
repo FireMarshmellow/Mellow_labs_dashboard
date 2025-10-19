@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Payroll Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+  <script src="shared_api.js"></script>
+  <meta name="color-scheme" content="dark light" />
+  <style>
+    :root { color-scheme: dark; }
+    html { overflow-y: scroll; }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+    .button-hover { transition: all 0.2s ease; }
+    .button-hover:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(148,163,184,0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.35); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.55); }
+    table tbody tr:hover { background: rgba(148,163,184,0.08); }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-slate-100 min-h-screen">
+  <main class="max-w-6xl mx-auto p-6 space-y-8">
+    <header class="hidden">
+      <div class="flex items-center gap-3">
+        <svg class="w-9 h-9 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h3.5a1.5 1.5 0 110 3H6v11a2 2 0 01-2 2h-.5A1.5 1.5 0 012.5 18V7.5A1.5 1.5 0 014 6zm16 0a2 2 0 00-2-2h-3.5a1.5 1.5 0 100 3H18v11a2 2 0 002 2h.5a1.5 1.5 0 001.5-1.5V7.5A1.5 1.5 0 0020 6z"></path>
+        </svg>
+        <div>
+          <h1 class="text-3xl font-bold text-white">Payroll Dashboard</h1>
+          <p class="text-sm text-slate-300">Monitor employee payouts, trends, and team costs.</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button id="btnRefresh" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 1119 5"></path>
+          </svg>
+          Refresh
+        </button>
+        </div>
+    </header>
+    <nav class="bg-slate-800/50 rounded-2xl p-2 flex flex-wrap gap-2 text-sm">
+      <a href="financial_summary.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Summary</a>
+      <a href="standalone_income_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Income</a>
+      <a href="standalone_expense_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Expenses</a>
+      <a href="standalone_payroll_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500">Payroll</a>
+      <a href="settings.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Settings</a>
+    </nav>
+
+    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 relative z-50 overflow-visible isolate">
+      <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+        <div class="flex flex-wrap gap-4">
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Start Date
+            <input id="startDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            End Date
+            <input id="endDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Quick Range
+            <select id="quickSelect" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm">
+              <option value="1m">Last Month</option>
+              <option value="3m">Last 3 Months</option>
+              <option value="6m">Last 6 Months</option>
+              <option value="1y">Last Year</option>
+              <option value="all">All Time</option>
+            </select>
+          </label>
+        </div>
+        <div class="flex flex-1 gap-3">
+          <label class="flex-1 text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Search
+            <input id="search" placeholder="Find by employee or notes..." class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <button id="btnApplyFilters" class="button-hover px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-sm h-fit mt-auto">
+            Apply
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Add Payroll Form -->
+    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 relative z-50 overflow-visible">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-slate-100">Add Payroll</h2>
+        <span class="text-xs text-slate-400">Create a new payroll entry</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Date
+          <input id="payDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-2">
+          Employee
+          <select id="payEmployeeSelect" class="hidden"></select>
+          <button id="payEmployeePicker" type="button" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm text-left hover:bg-slate-800/60">Select...</button>
+          <input id="payEmployeeCustom" type="text" placeholder="Custom employee" class="mt-2 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm hidden" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Amount
+          <input id="payAmount" type="number" step="0.01" min="0" placeholder="0.00" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-3">
+          Notes
+          <input id="payNotes" type="text" placeholder="Optional notes" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <div class="md:col-span-3 flex items-end gap-2">
+          <button id="btnAddPayroll" class="button-hover flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-sm">Add</button>
+          <button id="btnCancelPayrollEdit" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm hidden">Cancel</button>
+        </div>
+      </div>
+      <p id="addPayrollMsg" class="text-xs text-slate-400"></p>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Total Payroll</p>
+        <p id="statTotal" class="text-2xl font-semibold text-blue-300">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Average Payout</p>
+        <p id="statAverage" class="text-2xl font-semibold text-slate-100">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Largest Payout</p>
+        <p id="statLargest" class="text-2xl font-semibold text-emerald-300">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Employees Paid</p>
+        <p id="statEmployees" class="text-2xl font-semibold text-slate-100">0</p>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-slate-800/60 rounded-2xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-slate-100">Payroll Timeline</h2>
+          <span class="text-xs text-slate-400">Total per day</span>
+        </div>
+        <div class="relative h-72">
+          <canvas id="timelineChart" class="!h-full !w-full"></canvas>
+        </div>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-slate-100">Top Employees</h2>
+          <span class="text-xs text-slate-400">Total paid</span>
+        </div>
+        <div class="relative h-72">
+          <canvas id="employeeChart" class="!h-full !w-full"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-100">Payroll Transactions</h2>
+          <p class="text-xs text-slate-400" id="tableSummary">Showing 0 entries</p>
+        </div>
+        </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-xs uppercase text-slate-400 border-b border-slate-700/60">
+            <tr>
+              <th class="py-3 px-3 text-left"> </th>
+              <th class="py-3 px-3 text-left cursor-pointer hover:bg-slate-700/30" data-sort="date">Date</th>
+              <th class="py-3 px-3 text-left cursor-pointer hover:bg-slate-700/30" data-sort="employee">Employee</th>
+              <th class="py-3 px-3 text-right cursor-pointer hover:bg-slate-700/30" data-sort="amount">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody" class="divide-y divide-slate-700/40"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+    const state = { all: [], filtered: [] };
+
+    const refs = {
+      startDate: document.getElementById('startDate'),
+      endDate: document.getElementById('endDate'),
+      quickSelect: document.getElementById('quickSelect'),
+      search: document.getElementById('search'),
+      sortBy: document.getElementById('sortBy'),
+      summary: document.getElementById('tableSummary'),
+      tableBody: document.getElementById('tableBody'),
+      statTotal: document.getElementById('statTotal'),
+      statAverage: document.getElementById('statAverage'),
+      statLargest: document.getElementById('statLargest'),
+      statEmployees: document.getElementById('statEmployees'),
+    };
+
+    let timelineChart;
+    let employeeChart;
+
+    function mapRecord(rec) {
+      return {
+        id: rec.id,
+        date: rec.date,
+        employee: rec.employee || 'Unknown',
+        amount: Number(rec.amount || 0),
+        notes: rec.notes || '',
+      };
+    }
+
+    async function ensureApi() {
+      if (!window.API) throw new Error('API helper missing');
+      if (!API.available) await API.init('');
+      if (!API.available) throw new Error('Backend unavailable');
+    }
+
+    async function loadData() {
+      await ensureApi();
+      const data = await API.payroll.list();
+      state.all = data.map(mapRecord);
+    }
+
+    function setQuickRange(value) {
+      if (!state.all.length) return;
+      const dates = state.all.map(r => new Date(r.date)).filter(d => !isNaN(d));
+      const end = dates.length ? new Date(Math.max(...dates)) : new Date();
+      const start = new Date(end);
+      switch (value) {
+        case '1m': start.setMonth(end.getMonth() - 1); break;
+        case '3m': start.setMonth(end.getMonth() - 3); break;
+        case '6m': start.setMonth(end.getMonth() - 6); break;
+        case '1y': start.setFullYear(end.getFullYear() - 1); break;
+        case 'all':
+          start.setTime(dates.length ? Math.min(...dates) : end.getTime());
+          break;
+      }
+      refs.startDate.valueAsDate = start;
+      refs.endDate.valueAsDate = end;
+    }
+
+        let sortField = 'date';
+    let sortDir = 'desc';
+
+    function updateSortIndicators(){
+      document.querySelectorAll('th[data-sort]').forEach(th=>{
+        const key=th.dataset.sort; const base=th.textContent.replace(/[\s??]+$/, '').trim(); const active = key===sortField; th.textContent = base + (active ? (sortDir==='asc'?' ?':' ?') : '');
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded',()=>{
+      document.querySelectorAll('th[data-sort]').forEach(th=>{
+        th.addEventListener('click',()=>{ const key=th.dataset.sort; if(sortField===key) sortDir=(sortDir==='asc'?'desc':'asc'); else { sortField=key; sortDir='desc'; } updateSortIndicators(); applyFilters(); });
+      });
+    });function applyFilters() {
+      const start = refs.startDate.value ? new Date(refs.startDate.value) : null;
+      const end = refs.endDate.value ? new Date(refs.endDate.value) : null;
+      const q = refs.search.value.trim().toLowerCase();
+
+      state.filtered = state.all.filter(rec => {
+        const d = new Date(rec.date);
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        if (!q) return true;
+        const haystack = [rec.employee, rec.notes, rec.amount].join(' ').toLowerCase();
+        return haystack.includes(q);
+      });
+
+            // sort based on header controls
+      state.filtered.sort((a,b)=>{
+        let cmp = 0;
+        switch (sortField) {
+          case 'date': cmp = new Date(a.date) - new Date(b.date); break;
+          case 'amount': cmp = (a.amount||0) - (b.amount||0); break;
+          case 'employee': cmp = (a.employee||'').localeCompare(b.employee||''); return sortDir==='asc'? cmp : -cmp;
+        }
+        return sortDir==='asc'? cmp : -cmp;
+      });
+      updateSortIndicators();updateStats();
+      updateCharts();
+      updateSortIndicators();`r`n      renderTable();
+    }
+
+    function updateStats() {
+      const total = state.filtered.reduce((sum, rec) => sum + rec.amount, 0);
+      const avg = state.filtered.length ? total / state.filtered.length : 0;
+      const largest = state.filtered.reduce((max, rec) => Math.max(max, rec.amount), 0);
+      const employees = new Set(state.filtered.map(rec => rec.employee)).size;
+
+      refs.statTotal.textContent = gbp.format(total);
+      refs.statAverage.textContent = gbp.format(avg);
+      refs.statLargest.textContent = gbp.format(largest);
+      refs.statEmployees.textContent = employees.toString();
+    }
+
+    function updateCharts() {
+      const byDate = {};
+      const byEmployee = {};
+      for (const rec of state.filtered) {
+        byDate[rec.date] = (byDate[rec.date] || 0) + rec.amount;
+        byEmployee[rec.employee] = (byEmployee[rec.employee] || 0) + rec.amount;
+      }
+
+      const dates = Object.keys(byDate).sort((a, b) => new Date(a) - new Date(b));
+      timelineChart.data.labels = dates;
+      timelineChart.data.datasets[0].data = dates.map(date => byDate[date]);
+      timelineChart.update();
+
+      const employees = Object.entries(byEmployee).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      employeeChart.data.labels = employees.map(([name]) => name);
+      employeeChart.data.datasets[0].data = employees.map(([, value]) => value);
+      employeeChart.update();
+    }
+
+    // Compact rows + expandable details
+    function renderTable() {
+      refs.summary.textContent = `Showing ${state.filtered.length} entr${state.filtered.length === 1 ? 'y' : 'ies'}`;
+      refs.tableBody.innerHTML = state.filtered.map(rec => `
+        <tr class="transition-colors" data-row-id="${rec.id}">
+          <td class="py-3 px-3"><button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-toggle="details" data-id="${rec.id}">Details</button></td>
+          <td class="py-3 px-3 whitespace-nowrap text-slate-200">${rec.date}</td>
+          <td class="py-3 px-3 text-slate-100">${rec.employee}</td>
+          <td class="py-3 px-3 text-right text-blue-300 font-medium">${gbp.format(rec.amount)}</td>
+        </tr>
+        <tr id="pay-details-${rec.id}" class="hidden bg-slate-800/40"><td colspan="4" class="px-3 py-3">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+            <div class="md:col-span-2"><span class="text-slate-400">Notes:</span> <span class="text-slate-200">${rec.notes||'N/A'}</span></div>
+            <div class="text-right">
+              <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-action="edit" data-id="${rec.id}">Edit</button>
+              <button class="ml-2 px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-xs" data-action="delete" data-id="${rec.id}">Delete</button>
+            </div>
+          </div>
+        </td></tr>
+      `).join('');
+    }
+
+    function initCharts() {
+      timelineChart = new Chart(document.getElementById('timelineChart').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Total Payroll',
+            data: [],
+            tension: 0.35,
+            fill: true,
+            borderColor: 'rgb(96,165,250)',
+            backgroundColor: 'rgba(96,165,250,0.25)',
+            pointRadius: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: 'time', time: { unit: 'month' }, grid: { color: 'rgba(148,163,184,0.2)' } },
+            y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.1)' } },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${gbp.format(ctx.parsed.y)}` } },
+          },
+        },
+      });
+
+      employeeChart = new Chart(document.getElementById('employeeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Total Paid',
+            data: [],
+            backgroundColor: 'rgba(96,165,250,0.65)',
+            borderColor: 'rgba(96,165,250,0.95)',
+            borderWidth: 1,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#cbd5f5' }, grid: { display: false } },
+            y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.1)' } },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${gbp.format(ctx.parsed.y)}` } },
+          },
+        },
+      });
+    }
+
+        }
+
+    async function bootstrap() {
+      try {
+        await loadData();
+        if (!refs.startDate.value) setQuickRange('6m');
+        initCharts();
+        applyFilters();
+      } catch (err) {
+        console.error(err);
+        alert('Unable to load payroll data. Please ensure the backend server is running.');
+      }
+    }
+
+    
+    document.getElementById('btnRefresh').addEventListener('click', async () => {
+      await loadData();
+      applyFilters();
+    });
+    document.getElementById('btnApplyFilters').addEventListener('click', applyFilters);
+    refs.quickSelect.addEventListener('change', () => {
+      setQuickRange(refs.quickSelect.value);
+      applyFilters();
+    });
+    refs.startDate.addEventListener('change', applyFilters);
+    refs.endDate.addEventListener('change', applyFilters);
+    refs.search.addEventListener('input', applyFilters);
+
+    // Payroll add/edit/delete handlers + employee dropdown
+    let payEditingId = null;
+    (function initPayrollActions(){
+      const dateEl = document.getElementById('payDate');
+      const empSel = document.getElementById('payEmployeeSelect');
+      const empCustomEl = document.getElementById('payEmployeeCustom');
+      const amountEl = document.getElementById('payAmount');
+      const notesEl = document.getElementById('payNotes');
+      const addBtn = document.getElementById('btnAddPayroll');
+      const cancelBtn = document.getElementById('btnCancelPayrollEdit');
+      const msgEl = document.getElementById('addPayrollMsg');
+
+      const STORAGE_KEY = 'payroll.customEmployees.v1';
+      const DEFAULT_EMPLOYEES = ["Alex Johnson","Jamie Lee","Taylor Morgan","Casey Nguyen","Riley Patel"];
+      function loadList(){ try{ const v = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); return Array.isArray(v)?v:[]; }catch{ return []; } }
+      function saveList(arr){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr||[])); }catch{} }
+      function unique(arr){ const seen=new Set(); const out=[]; for(const s of arr){ const k=(s||'').trim(); if(!k) continue; const low=k.toLowerCase(); if(!seen.has(low)){ seen.add(low); out.push(k); } } return out; }
+      function populateSelect(selectEl, items, customEl){
+        if(!selectEl) return;
+        const frag=document.createDocumentFragment();
+        const ph=document.createElement('option'); ph.value=''; ph.textContent='Select...'; frag.appendChild(ph);
+        for(const it of items){ const o=document.createElement('option'); o.value=it; o.textContent=it; frag.appendChild(o); }
+        const c=document.createElement('option'); c.value='__custom'; c.textContent='Custom...'; frag.appendChild(c);
+        selectEl.innerHTML=''; selectEl.appendChild(frag);
+        selectEl.addEventListener('change',()=>{
+          const isC=selectEl.value==='__custom';
+          if(customEl){ customEl.classList.toggle('hidden', !isC); if(isC) customEl.focus(); }
+        });
+      }
+      function buildOverlayMenu(anchorEl, selectEl){
+        const rect = anchorEl.getBoundingClientRect();
+        const menu = document.createElement('div');
+        menu.style.position='fixed';
+        menu.style.left = rect.left + 'px';
+        const maxDown = Math.max(0, window.innerHeight - rect.bottom - 8);
+        const maxUp = Math.max(0, rect.top - 8);
+        const openUp = maxDown < 160 && maxUp > maxDown;
+        menu.style.top = (openUp ? (rect.top - Math.min(280, maxUp)) : rect.bottom) + 'px';
+        menu.style.width = rect.width + 'px';
+        menu.style.maxHeight = (openUp ? Math.min(280, maxUp) : Math.min(280, maxDown)) + 'px';
+        menu.style.overflow='auto';
+        menu.style.zIndex='10000';
+        menu.style.background='rgba(15,23,42,0.98)';
+        menu.style.border='1px solid rgba(100,116,139,0.4)';
+        menu.style.borderRadius='0.5rem';
+        menu.style.boxShadow='0 10px 20px rgba(0,0,0,0.35)';
+        menu.style.padding='6px 0';
+        const opts = Array.from(selectEl.options||[]);
+        for(const opt of opts){
+          const item=document.createElement('div');
+          item.textContent = opt.textContent || opt.value || '';
+          item.dataset.value = opt.value || '';
+          item.style.padding='6px 12px'; item.style.cursor='pointer'; item.style.color='#e5e7eb';
+          item.addEventListener('mouseenter', ()=> item.style.background='rgba(51,65,85,0.6)');
+          item.addEventListener('mouseleave', ()=> item.style.background='transparent');
+          item.addEventListener('click', ()=>{
+            selectEl.value=item.dataset.value;
+            selectEl.dispatchEvent(new Event('change'));
+            anchorEl.textContent=item.textContent || 'Select...';
+            if(menu.parentNode) document.body.removeChild(menu);
+          });
+          menu.appendChild(item);
+        }
+        const closer=(ev)=>{
+          if(menu && !menu.contains(ev.target) && ev.target!==anchorEl){
+            document.removeEventListener('mousedown', closer, true);
+            if(menu.parentNode) document.body.removeChild(menu);
+          }
+        };
+        document.addEventListener('mousedown', closer, true);
+        document.body.appendChild(menu);
+        if (openUp) menu.scrollTop = menu.scrollHeight;
+      }
+      function setSelectValue(selectEl, customEl, value){
+        if(!selectEl) return;
+        const val=String(value||'').trim(); let found=false;
+        for(let i=0;i<selectEl.options.length;i++){
+          const opt=selectEl.options[i];
+          if((opt.value||'').toLowerCase()===val.toLowerCase()){ selectEl.value=opt.value; found=true; break; }
+        }
+        if(!found){ selectEl.value='__custom'; if(customEl){ customEl.classList.remove('hidden'); customEl.value=val; } }
+        else if(customEl){ customEl.classList.add('hidden'); customEl.value=''; }
+      }
+      function expandOnOpen(selectEl){
+        if(!selectEl) return;
+        selectEl.addEventListener('mousedown', function(){ const count=this.options?this.options.length:0; this.size=Math.min(8, count||8); });
+        const close=function(){ this.size=0; this.removeAttribute('size'); };
+        selectEl.addEventListener('blur', close);
+        selectEl.addEventListener('change', close);
+      }
+      const initialEmployees = loadList();
+      const combined = unique([ ...DEFAULT_EMPLOYEES, ...initialEmployees ]);
+      populateSelect(empSel, combined, empCustomEl);
+      const picker = document.getElementById('payEmployeePicker');
+      const syncPicker = ()=>{ const v=empSel.value||''; const opt = Array.from(empSel.options||[]).find(o=>o.value===v); if (picker) picker.textContent = (opt&&opt.textContent)?opt.textContent:'Select...'; };
+      if (picker){ picker.addEventListener('click', ()=> buildOverlayMenu(picker, empSel)); empSel.addEventListener('change', syncPicker); syncPicker(); }
+      if ((combined||[]).length === 0 && empSel) { empSel.value = '__custom'; if (empCustomEl) empCustomEl.classList.remove('hidden'); syncPicker(); }
+      function setMsg(t, ok){ if(!msgEl) return; msgEl.textContent=t||''; msgEl.className='text-xs ' + (ok?'text-emerald-300':'text-amber-300'); }
+      function setEditMode(on){.classList.add('hidden'); }
+      }
+      if (cancelBtn) cancelBtn.addEventListener('click', ()=> setEditMode(false));
+
+      if (addBtn) addBtn.addEventListener('click', async ()=>{
+        try{
+          await ensureApi();
+          const date = (dateEl?.value||'').trim();
+          const employee = (empSel?.value==='__custom' ? (empCustomEl?.value||'').trim() : (empSel?.value||'').trim());
+          const amount = Number(amountEl?.value||0);
+          const notes = (notesEl?.value||'').trim();
+          if(!date) return setMsg('Please select a date', false);
+          if(!employee) return setMsg('Enter/select an employee', false);
+          if(!isFinite(amount) || amount<=0) return setMsg('Amount must be greater than 0', false);
+          const payload = payEditingId ? { id: payEditingId, date, employee, amount, notes } : { date, employee, amount, notes };
+          const saved = await API.payroll.upsert(payload);
+          setMsg(payEditingId ? 'Payroll updated.' : 'Payroll added.', true);
+          if (employee && empSel?.value==='__custom') { const list = unique([ ...loadList(), employee ]); saveList(list); populateSelect(empSel, list, empCustomEl); empSel.value = employee; }
+          await loadData(); const d=new Date(saved.date); if(refs.startDate.value && new Date(refs.startDate.value)>d) refs.startDate.valueAsDate=d; if(refs.endDate.value && new Date(refs.endDate.value)<d) refs.endDate.valueAsDate=d; applyFilters();
+          amountEl.value=''; notesEl.value=''; if(empSel?.value==='__custom' && empCustomEl) empCustomEl.value='';
+          if (payEditingId) setEditMode(false);
+        }catch(err){ console.error(err); setMsg('Failed to save payroll.', false); }
+      });
+
+      if (refs.tableBody) refs.tableBody.addEventListener('click', async (e)=>{
+        const toggle = e.target.closest('[data-toggle="details"]');
+        if (toggle) { const tid = toggle.dataset.id; const row = document.getElementById('pay-details-'+tid); if(row) row.classList.toggle('hidden'); return; }
+        const btn = e.target.closest('button[data-action]'); if(!btn) return; const id=btn.dataset.id; const action=btn.dataset.action;
+        if(action==='delete'){
+          if(!confirm('Delete this payroll entry?')) return;
+          try{ await ensureApi(); const ok = await API.payroll.remove(id); if(ok){ await loadData(); applyFilters(); }
+          } catch(err){ console.error(err); alert('Failed to delete.'); }
+        } else if(action==='edit'){
+          const rec = state.all.find(r=>r.id===id); if(!rec) return;
+          try{ if(dateEl) dateEl.value=rec.date||''; setSelectValue(empSel, empCustomEl, rec.employee||''); if(amountEl) amountEl.value=String(rec.amount||0); if(notesEl) notesEl.value=rec.notes||''; payEditingId=id; setEditMode(true); } catch(err){ console.error(err); }
+        }
+      });
+    })();
+
+    bootstrap();
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+

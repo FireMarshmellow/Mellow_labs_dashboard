@@ -3,344 +3,682 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Income — Simple Tracker</title>
+  <title>Income Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+  <script src="shared_api.js"></script>
   <meta name="color-scheme" content="dark light" />
   <style>
     :root { color-scheme: dark; }
     html { overflow-y: scroll; }
-    .truncate-26ch { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    input[type=number]::-webkit-outer-spin-button,
-    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type=number] { -moz-appearance: textfield; }
-    
-    /* Ensure dropdown options are visible */
-    select option {
-      background-color: #1e293b;
-      color: #e2e8f0;
-    }
-
-    .transition-all { transition: all 0.2s ease-in-out; }
-    
-    input, select, textarea {
-      transition: all 0.2s ease;
-      border: 1px solid transparent;
-      background: rgba(10,14,20,0.6);
-    }
-    
-    input:hover, select:hover, textarea:hover {
-      border-color: rgba(148, 163, 184, 0.2);
-    }
-    
-    input:focus, select:focus, textarea:focus {
-      border-color: #3b82f6;
-      outline: none;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    }
-
-    tr:hover:not(:first-child) {
-      background-color: rgba(148, 163, 184, 0.05);
-    }
-
-    .button-hover {
-      transition: all 0.2s ease;
-      transform: translateY(0);
-    }
-    
-    .button-hover:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    .card-hover {
-      transition: all 0.3s ease;
-    }
-    
-    .card-hover:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: rgba(148, 163, 184, 0.1);
-      border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.3);
-      border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(148, 163, 184, 0.4);
-    }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+    .button-hover { transition: all 0.2s ease; }
+    .button-hover:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(148,163,184,0.12); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.35); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.5); }
+    table tbody tr:hover { background: rgba(148,163,184,0.08); }
   </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen">
   <main class="max-w-6xl mx-auto p-6 space-y-8">
-    <header class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover mb-6">
+    <header class="hidden">
       <div class="flex items-center gap-3">
-        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-9 h-9 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-        <h1 class="text-3xl font-bold bg-gradient-to-r from-green-500 to-green-300 bg-clip-text text-transparent">Income</h1>
-      </div>
-      <div class="flex gap-3">
-        <button id="btnExport" class="button-hover text-sm px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-          </svg>
-          Export CSV
-        </button>
-        <label class="button-hover text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 cursor-pointer flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-          </svg>
-          Import CSV<input id="fileImport" type="file" accept=".csv,text/csv" class="hidden" />
-        </label>
-        <button id="btnClear" class="button-hover text-sm px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-          </svg>
-          Clear All
-        </button>
-      </div>
-    </header>
-
-    <section class="p-6 rounded-2xl bg-slate-800/90 max-w-3xl shadow-lg backdrop-blur-sm card-hover mx-auto">
-      <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
-        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-        </svg>
-        New Income Entry
-      </h2>
-      <form id="form" class="grid gap-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div>
-            <label for="date" class="text-xs text-slate-300">Date</label>
-            <input id="date" type="date" required class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
-          </div>
-          
-          <div>
-            <label class="text-xs text-slate-300">Source</label>
-            <select id="source" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm">
-              <option value="Patreon">Patreon</option>
-              <option value="Sponsorship">Sponsorship</option>
-              <option value="Twitch">Twitch</option>
-              <option value="YouTube AdSense">YouTube AdSense</option>
-              <option value="Custom">Custom</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="text-xs text-slate-300">Payment Processor</label>
-            <select id="processor" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm">
-              <option value="Bank">Bank</option>
-              <option value="PayPal">PayPal</option>
-              <option value="Payoneer">Payoneer</option>
-              <option value="Custom">Custom</option>
-            </select>
-          </div>
-
-          <div>
-            <label for="amount" class="text-xs text-slate-300">Amount (£)</label>
-            <input id="amount" type="number" step="0.01" min="0" required class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
-          </div>
-
-          <div>
-            <label for="fees" class="text-xs text-slate-300">Fees (£)</label>
-            <input id="fees" type="number" step="0.01" min="0" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
-          </div>
-
-          <div>
-            <label for="notes" class="text-xs text-slate-300">Notes</label>
-            <textarea id="notes" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" rows="2"></textarea>
-          </div>
-
-          <div class="flex items-end">
-            <button type="submit" class="w-full py-2 rounded-lg bg-green-600 hover:bg-green-500 text-sm button-hover">Add Income</button>
-          </div>
+        <div>
+          <h1 class="text-3xl font-bold text-white">Income Dashboard</h1>
+          <p class="text-sm text-slate-300">Analyse your income streams, processors, and trends.</p>
         </div>
-      </form>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button id="btnRefresh" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 1119 5"></path>
+          </svg>
+          Refresh
+        </button>
+        </div>
+    </header>
+    <nav class="bg-slate-800/50 rounded-2xl p-2 flex flex-wrap gap-2 text-sm">
+      <a href="financial_summary.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Summary</a>
+      <a href="standalone_income_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500">Income</a>
+      <a href="standalone_expense_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Expenses</a>
+      <a href="standalone_payroll_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Payroll</a>
+      <a href="settings.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Settings</a>
+    </nav>
+
+    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 relative z-50 overflow-visible">
+      <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+        <div class="flex flex-wrap gap-4">
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Start Date
+            <input id="startDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            End Date
+            <input id="endDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Quick Range
+            <select id="quickSelect" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm">
+              <option value="1m">Last Month</option>
+              <option value="3m">Last 3 Months</option>
+              <option value="6m">Last 6 Months</option>
+              <option value="1y">Last Year</option>
+              <option value="all">All Time</option>
+            </select>
+          </label>
+        </div>
+        <div class="flex flex-1 gap-3">
+          <label class="flex-1 text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Search
+            <input id="search" placeholder="Find by source, processor, notes..." class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <button id="btnApplyFilters" class="button-hover px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-sm h-fit mt-auto">
+            Apply
+          </button>
+        </div>
+      </div>
     </section>
 
-    <section class="p-6 rounded-2xl bg-slate-800/90 shadow-lg backdrop-blur-sm card-hover max-w-[1160px] mx-auto">
-      <div class="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-6">
-        <div class="flex items-center gap-4">
-          <div class="bg-slate-700/50 rounded-lg p-3 text-center">
-            <div class="text-xs text-slate-400 mb-1">Entries</div>
-            <div class="text-xl font-semibold text-blue-400" id="count">0</div>
-          </div>
-          <div class="bg-slate-700/50 rounded-lg p-3 text-center">
-            <div class="text-xs text-slate-400 mb-1">Total Income</div>
-            <div class="text-xl font-semibold text-green-400" id="sum">£0.00</div>
-          </div>
+    <!-- Add Income Form -->
+    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-slate-100">Add Income</h2>
+        <span class="text-xs text-slate-400">Create a new income entry</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Date
+          <input id="incomeDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Source
+          <select id="incomeSourceSelect" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm"></select>
+          <input id="incomeSourceCustom" type="text" placeholder="Custom source" class="mt-2 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm hidden" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Processor
+          <select id="incomeProcessorSelect" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm"></select>
+          <input id="incomeProcessorCustom" type="text" placeholder="Custom processor" class="mt-2 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm hidden" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Amount
+          <input id="incomeAmount" type="number" step="0.01" min="0" placeholder="0.00" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Fees
+          <input id="incomeFees" type="number" step="0.01" min="0" placeholder="0.00" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-2 md:col-start-1 lg:col-span-2 lg:col-start-1">
+          Notes
+          <input id="incomeNotes" type="text" placeholder="Optional notes" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <div class="md:col-span-2 lg:col-span-1 flex items-end gap-2">
+          <button id="btnAddIncome" class="button-hover flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm">Add</button>
+          <button id="btnCancelEdit" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm hidden">Cancel</button>
         </div>
-        <div class="flex gap-4 text-sm">
-          <label class="flex items-center gap-2 bg-slate-700/30 rounded-lg px-4 py-2">
-            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-            <input id="filter" placeholder="Filter income..." class="bg-transparent border-none focus:ring-0 px-2 py-1 w-48" />
-          </label>
-          <label class="flex items-center gap-2 bg-slate-700/30 rounded-lg px-4 py-2">
-            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
-            </svg>
-            <select id="sortBy" class="bg-transparent border-none focus:ring-0 px-2 py-1 text-slate-200">
-              <option value="date desc">Latest First</option>
-              <option value="date asc">Oldest First</option>
-              <option value="amount desc">Highest Amount</option>
-              <option value="amount asc">Lowest Amount</option>
-            </select>
-          </label>
+      </div>
+      <p id="addIncomeMsg" class="text-xs text-slate-400"></p>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Total Gross</p>
+        <p id="statGross" class="text-2xl font-semibold text-emerald-400">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Total Fees</p>
+        <p id="statFees" class="text-2xl font-semibold text-rose-400">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Net Income</p>
+        <p id="statNet" class="text-2xl font-semibold text-blue-400">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Average Per Entry</p>
+        <p id="statAverage" class="text-2xl font-semibold text-slate-100">£0.00</p>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-slate-800/60 rounded-2xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-slate-100">Income Timeline</h2>
+          <span class="text-xs text-slate-400">Net amounts per day</span>
+        </div>
+        <div class="relative h-72">
+          <canvas id="timelineChart" class="!h-full !w-full"></canvas>
+        </div>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-slate-100">Sources Breakdown</h2>
+          <span class="text-xs text-slate-400">Top income sources</span>
+        </div>
+        <div class="relative h-72">
+          <canvas id="sourceChart" class="!h-full !w-full"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-100">Income Transactions</h2>
+          <p class="text-xs text-slate-400" id="tableSummary">Showing 0 entries</p>
         </div>
       </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-slate-400 border-b border-slate-700/50">
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[100px]">Date</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[140px]">Source</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[140px]">Processor</th>
-              <th class="py-4 px-3 font-medium text-right whitespace-nowrap w-[100px]">Amount</th>
-              <th class="py-4 px-3 font-medium text-right whitespace-nowrap w-[100px]">Fees</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[200px]">Notes</th>
-              <th class="py-4 px-3 font-medium text-right whitespace-nowrap w-[140px]">Actions</th>
+        <table class="min-w-full text-sm">
+          <thead class="text-xs uppercase text-slate-400 border-b border-slate-700/60"><tr>
+              <th class="py-3 px-3 text-left cursor-pointer hover:bg-slate-700/30" data-sort="date">Date</th>
+              <th class="py-3 px-3 text-left cursor-pointer hover:bg-slate-700/30" data-sort="source">Source</th>
+              <th class="py-3 px-3 text-left cursor-pointer hover:bg-slate-700/30" data-sort="processor">Processor</th>
+              <th class="py-3 px-3 text-right cursor-pointer hover:bg-slate-700/30" data-sort="gross">Gross</th>
+              <th class="py-3 px-3 text-right cursor-pointer hover:bg-slate-700/30" data-sort="fees">Fees</th>
+              <th class="py-3 px-3 text-right cursor-pointer hover:bg-slate-700/30" data-sort="net">Net</th>
+              <th class="py-3 px-3 text-left">Notes</th>
+              <th class="py-3 px-3 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody id="tbody"></tbody>
+          <tbody id="tableBody" class="divide-y divide-slate-700/40"></tbody>
         </table>
       </div>
     </section>
-  </div>
-
-  <template id="rowTpl">
-    <tr class="border-t border-slate-700/50 transition-colors">
-      <td class="py-4 px-3 whitespace-nowrap" data-k="date"></td>
-      <td class="px-3"><span class="px-2 py-1 rounded-full text-xs bg-blue-900/30 text-blue-300 inline-block max-w-[110px] truncate" data-k="source"></span></td>
-      <td class="px-3"><span class="px-2 py-1 rounded-full text-xs bg-slate-700/50 inline-block max-w-[110px] truncate" data-k="processor"></span></td>
-      <td class="text-right px-3 font-medium whitespace-nowrap text-green-400" data-k="amountFmt"></td>
-      <td class="text-right px-3 font-medium whitespace-nowrap text-rose-400" data-k="feesFmt"></td>
-      <td class="px-3 truncate-26ch" title="" data-k="notes"></td>
-      <td class="text-right px-3 whitespace-nowrap">
-        <button class="button-hover text-xs px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-1 inline-flex" data-act="edit">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-          </svg>
-          Edit
-        </button>
-        <button class="button-hover text-xs px-3 py-1 rounded-lg bg-rose-700 hover:bg-rose-600 ml-2 flex items-center gap-1 inline-flex" data-act="del">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-          </svg>
-          Delete
-        </button>
-      </td>
-    </tr>
-  </template>
+  </main>
 
   <script>
-    const LS_KEY = 'income.simple.v1';
-    const gbp = new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'});
-    let DATA = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+    const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
 
-    const form = document.getElementById('form');
-    const tbody = document.getElementById('tbody');
-    const countEl = document.getElementById('count');
-    const filter = document.getElementById('filter');
-    const sortBy = document.getElementById('sortBy');
+    const state = {
+      all: [],
+      filtered: [],
+    };
 
-    // Elements
-    const dateEl = document.getElementById('date');
-    const sourceEl = document.getElementById('source');
-    const processorEl = document.getElementById('processor');
-  const amountEl = document.getElementById('amount');
-  const feesEl = document.getElementById('fees');
-  const notesEl = document.getElementById('notes');
+    const refs = {
+      startDate: document.getElementById('startDate'),
+      endDate: document.getElementById('endDate'),
+      quickSelect: document.getElementById('quickSelect'),
+      search: document.getElementById('search'),
+      summary: document.getElementById('tableSummary'),
+      tableBody: document.getElementById('tableBody'),
+      statGross: document.getElementById('statGross'),
+      statFees: document.getElementById('statFees'),
+      statNet: document.getElementById('statNet'),
+      statAverage: document.getElementById('statAverage'),
+    };
 
-    // Prefill date
-    dateEl.valueAsDate = new Date();
+    let timelineChart;
+    let sourceChart;
+    let editingId = null;
 
-    function uid(){return Math.random().toString(36).slice(2)+Date.now().toString(36)}
-
-    function sanitizeCSV(s){ if (s==null) return ''; const str=String(s); return /[",\n]/.test(str)? '"'+str.replaceAll('"','""')+'"': str; }
-  function toCSV(rows){ const header=['Date','Source','Processor','AmountGBP','FeesGBP','Notes']; const lines=[header.join(',')]; for(const r of rows) lines.push([sanitizeCSV(r.date),sanitizeCSV(r.source),sanitizeCSV(r.processor),(Number(r.amount)||0).toFixed(2),(Number(r.fees)||0).toFixed(2),sanitizeCSV(r.notes||'')].join(',')); return lines.join('\n'); }
-  function parseCSV(text){ const rows=[]; let i=0,field='',row=[],inQuotes=false; while(i<text.length){ const ch=text[i++]; if(inQuotes){ if(ch==='"'){ if(text[i]==='"'){ field+="\""; i++; } else inQuotes=false; } else field+=ch; } else { if(ch==='"') inQuotes=true; else if(ch===','){ row.push(field); field=''; } else if(ch==='\n' || ch==='\r'){ if(field!==''||row.length){ row.push(field); rows.push(row); row=[]; field=''; } } else field+=ch; } } if(field!==''||row.length){ row.push(field); rows.push(row);} return rows.filter(r=>r.length>1); }
-  function csvToRows(csvText){ const rows=parseCSV(csvText); if(!rows.length) return []; const header=rows[0].map(h=>h.trim().toLowerCase()); const idx={date:header.indexOf('date'), source:header.indexOf('source'), processor:header.indexOf('processor'), amount:header.findIndex(h=>h.includes('amount')), fees:header.findIndex(h=>h.startsWith('fee')), notes:header.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; if(!row[idx.date]) continue; out.push({ id:uid(), date: row[idx.date]||'', source: row[idx.source]||'', processor: row[idx.processor]||'', amount: Number(String(row[idx.amount]||'0').replace(/[^0-9.\-]/g,''))||0, fees: Number(String(row[idx.fees]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[idx.notes]||'' }); } return out; }
-
-    function save(){ localStorage.setItem(LS_KEY, JSON.stringify(DATA)); }
-
-  function render() {
-    const q = filter.value.trim().toLowerCase();
-    const [key, dir] = sortBy.value.split(' ');
-    
-    // Filter
-    let rows = DATA.filter(r => !q || [r.date, r.source, r.processor, r.notes, (r.amount||0), (r.fees||0)].join(' ').toLowerCase().includes(q));
-    
-    // Sort
-    rows.sort((a,b) => {
-      if (key === 'date') {
-        return (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) * (dir === 'asc' ? 1 : -1);
-      }
-      if (key === 'amount') {
-        const amountA = Number(a.amount) || 0;
-        const amountB = Number(b.amount) || 0;
-        return (amountA - amountB) * (dir === 'asc' ? 1 : -1);
-      }
-      return 0;
-    });
-
-    // Update stats
-    count.textContent = String(rows.length);
-    const totalIncome = rows.reduce((acc, r) => acc + (Number(r.amount)||0), 0);
-    sum.textContent = gbp.format(totalIncome);
-    
-    // Render table
-    tbody.innerHTML = '';
-    const tpl = document.getElementById('rowTpl');
-    
-    for (const r of rows) {
-      const tr = tpl.content.firstElementChild.cloneNode(true);
-      tr.querySelector('[data-k=date]').textContent = r.date || '';
-      tr.querySelector('[data-k=source]').textContent = r.source || '';
-      tr.querySelector('[data-k=processor]').textContent = r.processor || '';
-      tr.querySelector('[data-k=amountFmt]').textContent = gbp.format(Number(r.amount)||0);
-      tr.querySelector('[data-k=feesFmt]').textContent = gbp.format(Number(r.fees)||0);
-      const notesEl = tr.querySelector('[data-k=notes]');
-      notesEl.textContent = r.notes || '';
-      notesEl.title = r.notes || '';
-      tr.dataset.id = r.id;
-      tbody.appendChild(tr);
+    function mapRecord(rec) {
+      const gross = Number(rec.amount || 0);
+      const fees = Number(rec.fees || 0);
+      const net = gross - fees;
+      return {
+        id: rec.id,
+        date: rec.date,
+        source: rec.source || 'Unknown',
+        processor: rec.processor || '',
+        gross,
+        fees,
+        net,
+        notes: rec.notes || '',
+      };
     }
-  }
 
-    // Custom selects
-    sourceEl.addEventListener('change', ()=>{ if(sourceEl.value==='Custom'){ const v=prompt('Enter custom source (e.g. BuyMeACoffee)'); if(v){ const opt=document.createElement('option'); opt.value=v; opt.textContent=v; sourceEl.appendChild(opt); sourceEl.value=v; } else { sourceEl.value='Patreon'; } } });
-    processorEl.addEventListener('change', ()=>{ if(processorEl.value==='Custom'){ const v=prompt('Enter custom processor (e.g. PayPal)'); if(v){ const opt=document.createElement('option'); opt.value=v; opt.textContent=v; processorEl.appendChild(opt); processorEl.value=v; } else { processorEl.value='Bank'; } } });
+    async function ensureApi() {
+      if (!window.API) throw new Error('API helper missing');
+      if (!API.available) await API.init('');
+      if (!API.available) throw new Error('Backend unavailable');
+    }
 
-    form.addEventListener('submit',(e)=>{ e.preventDefault(); const rec={ id:uid(), date: dateEl.value, source: sourceEl.value, processor: processorEl.value, amount: Number(amountEl.value)||0, fees: Number(feesEl.value)||0, notes: notesEl.value.trim() }; if(!rec.date) return; DATA.push(rec); save(); render(); form.reset(); dateEl.valueAsDate=new Date(); sourceEl.value='Patreon'; processorEl.value='Bank'; notesEl.focus(); // auto-download CSV
-      const csv=toCSV(DATA); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`income-${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    async function migrateIncomeFromLocal(){
+      try{
+        const raw = localStorage.getItem('income.simple.v1');
+        if(!raw) return 0; const arr = JSON.parse(raw||'[]'); if(!Array.isArray(arr) || !arr.length) return 0;
+        const existing = await API.income.list(); if((existing||[]).length) return 0;
+        let added=0; const keyOf = x=>[x.date,(x.source||'').toLowerCase(),Number(x.amount||0).toFixed(2),Number(x.fees||0).toFixed(2)].join('|');
+        const seen = new Set(existing.map(keyOf));
+        for(const it of arr){ const rec={ id: it.id||Math.random().toString(36).slice(2)+Date.now().toString(36), date: it.date||'', source: it.source||'', processor: it.processor||'', amount: Number(it.amount||0)||0, fees: Number(it.fees||0)||0, notes: it.notes||'' }; if(!rec.date) continue; if(!seen.has(keyOf(rec))){ await API.income.upsert(rec); seen.add(keyOf(rec)); added++; } }
+        return added;
+      }catch{ return 0; }
+    }
+
+    async function loadData() {
+      await ensureApi();
+      let records = await API.income.list();
+      if(!records.length){ const migrated = await migrateIncomeFromLocal(); if(migrated>0) records = await API.income.list(); }
+      state.all = records.map(mapRecord);
+    }
+
+    function setQuickRange(value) {
+      if (!state.all.length) return;
+      const dates = state.all.map(r => new Date(r.date)).filter(d => !isNaN(d));
+      const end = dates.length ? new Date(Math.max(...dates)) : new Date();
+      const start = new Date(end);
+      switch (value) {
+        case '1m': start.setMonth(end.getMonth() - 1); break;
+        case '3m': start.setMonth(end.getMonth() - 3); break;
+        case '6m': start.setMonth(end.getMonth() - 6); break;
+        case '1y': start.setFullYear(end.getFullYear() - 1); break;
+        case 'all':
+          start.setTime(dates.length ? Math.min(...dates) : end.getTime());
+          break;
+      }
+      refs.startDate.valueAsDate = start;
+      refs.endDate.valueAsDate = end;
+    }
+
+    let sortField = 'date';
+    let sortDir = 'desc';
+
+    function updateSortIndicators(){
+  document.querySelectorAll('th[data-sort]').forEach(th=>{
+    const key = th.dataset.sort;
+    const base = th.getAttribute('data-label') || th.textContent.replace(/[??]\s*$/, '').trim();
+    th.setAttribute('data-label', base);
+    const active = key === sortField;
+    th.textContent = base + (active ? (sortDir==='asc' ? ' ?' : ' ?') : '');
+  });
+    }
+
+    document.addEventListener('DOMContentLoaded',()=>{
+      document.querySelectorAll('th[data-sort]').forEach(th=>{
+        th.addEventListener('click',()=>{
+          const key = th.dataset.sort;
+          if (sortField === key) sortDir = (sortDir==='asc'?'desc':'asc'); else { sortField = key; sortDir='desc'; }
+          updateSortIndicators();
+          applyFilters();
+        });
+      });
     });
 
-  tbody.addEventListener('click',(e)=>{ const btn=e.target.closest('button'); if(!btn) return; const tr=btn.closest('tr'); const id=tr?.dataset?.id; const idx=DATA.findIndex(x=>x.id===id); if(idx===-1) return; const rec=DATA[idx]; if(btn.dataset.act==='del'){ if(confirm('Delete this row?')){ DATA.splice(idx,1); save(); render(); } } else if(btn.dataset.act==='edit'){ const date=prompt('Date (YYYY-MM-DD):', rec.date)||rec.date; const source=prompt('Source:', rec.source)||rec.source; const processor=prompt('Processor:', rec.processor)||rec.processor; const amount=Number(prompt('Amount (£):', rec.amount))||rec.amount; const fees=Number(prompt('Fees (£):', rec.fees))||rec.fees; const notes=prompt('Notes:', rec.notes)||rec.notes; Object.assign(rec,{date,source,processor,amount,fees,notes}); save(); render(); } });
+    function applyFilters() {
+      const start = refs.startDate.value ? new Date(refs.startDate.value) : null;
+      const end = refs.endDate.value ? new Date(refs.endDate.value) : null;
+      const q = refs.search.value.trim().toLowerCase();
 
-    // CSV export/import
-    document.getElementById('btnExport').addEventListener('click', ()=>{ const csv=toCSV(DATA); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`income-${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); });
-  document.getElementById('fileImport').addEventListener('change',(e)=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ const items=csvToRows(String(r.result||'')); if(!items.length){ alert('No rows found'); return; } const keyOf = x=>[x.date,x.source,Number(x.amount||0).toFixed(2)].join('|'); const exist=new Set(DATA.map(keyOf)); let added=0; for(const it of items){ if(!exist.has(keyOf(it))){ DATA.push(it); added++; } } save(); render(); alert(`Imported ${added} new row(s)`); }; r.readAsText(f); e.target.value=''; });
-    document.getElementById('btnClear').addEventListener('click',()=>{ if(!confirm('Clear all income data?')) return; DATA=[]; save(); render(); });
+      state.filtered = state.all.filter(rec => {
+        const d = new Date(rec.date);
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        if (!q) return true;
+        const haystack = [rec.source, rec.processor, rec.notes, rec.gross, rec.net].join(' ').toLowerCase();
+        return haystack.includes(q);
+      });
 
-    // Add event listeners for sort and filter
-    sortBy.addEventListener('change', render);
-    filter.addEventListener('input', render);
+      state.filtered.sort((a,b)=>{
+        let cmp = 0;
+        switch (sortField) {
+          case 'date': cmp = new Date(a.date) - new Date(b.date); break;
+          case 'source': cmp = (a.source||'').localeCompare(b.source||''); break;
+          case 'processor': cmp = (a.processor||'').localeCompare(b.processor||''); break;
+          case 'gross': cmp = (a.gross||0) - (b.gross||0); break;
+          case 'fees': cmp = (a.fees||0) - (b.fees||0); break;
+          case 'net': cmp = (a.net||0) - (b.net||0); break;
+        }
+        return sortDir==='asc' ? cmp : -cmp;
+      });
 
-    // init
-    render();
+      updateStats();
+      updateCharts();
+      updateSortIndicators();
+      renderTable();
+    }
+
+    function updateStats() {
+      const gross = state.filtered.reduce((sum, rec) => sum + rec.gross, 0);
+      const fees = state.filtered.reduce((sum, rec) => sum + rec.fees, 0);
+      const net = gross - fees;
+      const avg = state.filtered.length ? net / state.filtered.length : 0;
+      refs.statGross.textContent = gbp.format(gross);
+      refs.statFees.textContent = gbp.format(fees);
+      refs.statNet.textContent = gbp.format(net);
+      refs.statAverage.textContent = gbp.format(avg);
+    }
+
+    function updateCharts() {
+      const byDate = {};
+      const bySource = {};
+      for (const rec of state.filtered) {
+        byDate[rec.date] = (byDate[rec.date] || 0) + rec.net;
+        const key = rec.source || 'Unknown';
+        bySource[key] = (bySource[key] || 0) + rec.net;
+      }
+
+      const dates = Object.keys(byDate).sort((a, b) => new Date(a) - new Date(b));
+      timelineChart.data.labels = dates;
+      timelineChart.data.datasets[0].data = dates.map(date => byDate[date]);
+      timelineChart.update();
+
+      const sources = Object.entries(bySource)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      sourceChart.data.labels = sources.map(([label]) => label);
+      sourceChart.data.datasets[0].data = sources.map(([, value]) => value);
+      sourceChart.update();
+    }
+
+    function renderTable() {
+      refs.summary.textContent = `Showing ${state.filtered.length} entr${state.filtered.length === 1 ? 'y' : 'ies'}`;
+      refs.tableBody.innerHTML = state.filtered.map(rec => `
+        <tr class="transition-colors">
+          <td class="py-3 px-3 whitespace-nowrap text-slate-200">${rec.date}</td>
+          <td class="py-3 px-3 text-slate-100">${rec.source}</td>
+          <td class="py-3 px-3 text-slate-300">${rec.processor || '—'}</td>
+          <td class="py-3 px-3 text-right text-emerald-300">${gbp.format(rec.gross)}</td>
+          <td class="py-3 px-3 text-right text-rose-300">${gbp.format(rec.fees)}</td>
+          <td class="py-3 px-3 text-right text-blue-300 font-medium">${gbp.format(rec.net)}</td>
+          <td class="py-3 px-3 text-slate-300">${rec.notes || '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function initCharts() {
+      const timelineCtx = document.getElementById('timelineChart').getContext('2d');
+      timelineChart = new Chart(timelineCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Net Income',
+            data: [],
+            fill: true,
+            tension: 0.35,
+            borderColor: 'rgb(34,197,94)',
+            backgroundColor: 'rgba(34,197,94,0.25)',
+            pointRadius: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: 'time', time: { unit: 'month' }, grid: { color: 'rgba(148,163,184,0.2)' } },
+            y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.1)' } },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${gbp.format(ctx.parsed.y)}` } },
+          },
+        },
+      });
+
+      const sourceCtx = document.getElementById('sourceChart').getContext('2d');
+      sourceChart = new Chart(sourceCtx, {
+        type: 'doughnut',
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            backgroundColor: [
+              'rgba(34,197,94,0.8)',
+              'rgba(129,140,248,0.8)',
+              'rgba(56,189,248,0.8)',
+              'rgba(251,191,36,0.8)',
+              'rgba(248,113,113,0.8)',
+              'rgba(156,163,175,0.8)',
+              'rgba(216,180,254,0.8)',
+              'rgba(134,239,172,0.8)',
+              'rgba(252,211,77,0.8)',
+              'rgba(148,163,184,0.8)',
+            ],
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#cbd5f5', boxWidth: 12 } },
+            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${gbp.format(ctx.parsed)}` } },
+          },
+        },
+      });
+    }
+
+    // Override table renderer to include action buttons
+    function renderTable() {
+      refs.summary.textContent = `Showing ${state.filtered.length} entr${state.filtered.length === 1 ? 'y' : 'ies'}`;
+      refs.tableBody.innerHTML = state.filtered.map(rec => `
+        <tr class="transition-colors">
+          <td class="py-3 px-3 whitespace-nowrap text-slate-200">${rec.date}</td>
+          <td class="py-3 px-3 text-slate-100">${rec.source}</td>
+          <td class="py-3 px-3 text-slate-300">${rec.processor || 'N/A'}</td>
+          <td class="py-3 px-3 text-right text-emerald-300">${gbp.format(rec.gross)}</td>
+          <td class="py-3 px-3 text-right text-rose-300">${gbp.format(rec.fees)}</td>
+          <td class="py-3 px-3 text-right text-blue-300 font-medium">${gbp.format(rec.net)}</td>
+          <td class="py-3 px-3 text-slate-300">${rec.notes || 'N/A'}</td>
+          <td class="py-3 px-3 text-right whitespace-nowrap">
+            <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-action="edit" data-id="${rec.id}">Edit</button>
+            <button class="ml-2 px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-xs" data-action="delete" data-id="${rec.id}">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Table actions: edit/delete handlers
+    (function initTableActions(){
+      function setSelectValue(selectEl, customEl, value){
+        if(!selectEl) return;
+        const val = String(value || '').trim();
+        let found = false;
+        for (let i=0;i<selectEl.options.length;i++) {
+          const opt = selectEl.options[i];
+          if ((opt.value||'').toLowerCase() === val.toLowerCase()) { selectEl.value = opt.value; found = true; break; }
+        }
+        if (!found) {
+          selectEl.value = '__custom';
+          if (customEl) { customEl.classList.remove('hidden'); customEl.value = val; }
+        } else if (customEl) {
+          customEl.classList.add('hidden'); customEl.value = '';
+        }
+      }
+
+      const addBtn = document.getElementById('btnAddIncome');
+      const cancelBtn = document.getElementById('btnCancelEdit');
+      const dateEl = document.getElementById('incomeDate');
+      const sourceSel = document.getElementById('incomeSourceSelect');
+      const sourceCustomEl = document.getElementById('incomeSourceCustom');
+      const procSel = document.getElementById('incomeProcessorSelect');
+      const procCustomEl = document.getElementById('incomeProcessorCustom');
+      const amountEl = document.getElementById('incomeAmount');
+      const feesEl = document.getElementById('incomeFees');
+      const notesEl = document.getElementById('incomeNotes');
+
+      function setEditMode(on){
+        if (!addBtn || !cancelBtn) return;
+        if (on) {
+          addBtn.textContent = 'Save';
+          addBtn.classList.remove('bg-emerald-600','hover:bg-emerald-500');
+          addBtn.classList.add('bg-blue-600','hover:bg-blue-500');
+          cancelBtn.classList.remove('hidden');
+        } else {
+          editingId = null;
+          addBtn.textContent = 'Add';
+          addBtn.classList.remove('bg-blue-600','hover:bg-blue-500');
+          addBtn.classList.add('bg-emerald-600','hover:bg-emerald-500');
+          cancelBtn.classList.add('hidden');
+        }
+      }
+
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', ()=> setEditMode(false));
+      }
+
+      if (refs.tableBody) {
+        refs.tableBody.addEventListener('click', async (e)=>{
+          const btn = e.target.closest('button[data-action]');
+          if (!btn) return;
+          const id = btn.dataset.id;
+          const action = btn.dataset.action;
+          if (action === 'delete') {
+            if (!confirm('Delete this income?')) return;
+            try {
+              await ensureApi();
+              const ok = await API.income.remove(id);
+              if (ok) { await loadData(); applyFilters(); }
+            } catch (err) { console.error(err); alert('Failed to delete.'); }
+          } else if (action === 'edit') {
+            const rec = state.all.find(r => r.id === id);
+            if (!rec) return;
+            try {
+              if (dateEl) dateEl.value = rec.date || '';
+              setSelectValue(sourceSel, sourceCustomEl, rec.source || '');
+              setSelectValue(procSel, procCustomEl, rec.processor || '');
+              if (amountEl) amountEl.value = String(rec.gross || 0);
+              if (feesEl) feesEl.value = String(rec.fees || 0);
+              if (notesEl) notesEl.value = rec.notes || '';
+              editingId = id;
+              setEditMode(true);
+            } catch (err) { console.error(err); }
+          }
+        });
+      }
+    })();
+
+    async function bootstrap() {
+      try {
+        await loadData();
+        if (!refs.startDate.value) setQuickRange('3m');
+        initCharts();
+        applyFilters();
+      } catch (err) {
+        console.error(err);
+        alert('Unable to load income data. Please ensure the backend server is running.');
+      }
+    }
+
+    
+    document.getElementById('btnRefresh').addEventListener('click', async () => {
+      await loadData();
+      applyFilters();
+    });
+    document.getElementById('btnApplyFilters').addEventListener('click', applyFilters);
+    refs.quickSelect.addEventListener('change', () => {
+      setQuickRange(refs.quickSelect.value);
+      applyFilters();
+    });
+    refs.startDate.addEventListener('change', applyFilters);
+    refs.endDate.addEventListener('change', applyFilters);
+    refs.search.addEventListener('input', applyFilters);
+    
+    // Add Income handler
+    (function initAddIncome(){
+      const dateEl = document.getElementById('incomeDate');
+      const sourceSel = document.getElementById('incomeSourceSelect');
+      const sourceCustomEl = document.getElementById('incomeSourceCustom');
+      const procSel = document.getElementById('incomeProcessorSelect');
+      const procCustomEl = document.getElementById('incomeProcessorCustom');
+      const amountEl = document.getElementById('incomeAmount');
+      const feesEl = document.getElementById('incomeFees');
+      const notesEl = document.getElementById('incomeNotes');
+      const msgEl = document.getElementById('addIncomeMsg');
+      const btn = document.getElementById('btnAddIncome');
+      if (!btn) return;
+
+      const STORAGE = {
+        sources: 'income.customSources.v1',
+        processors: 'income.customProcessors.v1',
+      };
+      const defaults = {
+        sources: ['Patreon','Twitch','Fourthwall','YouTube AdSense','JLCPCB.com'],
+        processors: ['Payoneer','PayPal','Bank'],
+      };
+      function loadList(key){ try{ const v = JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(v)?v:[]; }catch{ return []; } }
+      function saveList(key, arr){ try{ localStorage.setItem(key, JSON.stringify(arr||[])); }catch{} }
+      function unique(arr){ const seen=new Set(); const out=[]; for(const s of arr){ const k=(s||'').trim(); if(!k) continue; const low=k.toLowerCase(); if(!seen.has(low)){ seen.add(low); out.push(k); } } return out; }
+
+      function populateSelect(selectEl, items, customEl){
+        if(!selectEl) return;
+        const opts = ['','Custom...'];
+        const frag = document.createDocumentFragment();
+        const placeholder = document.createElement('option'); placeholder.value=''; placeholder.textContent='Select...'; frag.appendChild(placeholder);
+        for(const it of items){ const o=document.createElement('option'); o.value=it; o.textContent=it; frag.appendChild(o); }
+        const customOpt=document.createElement('option'); customOpt.value='__custom'; customOpt.textContent='Custom...'; frag.appendChild(customOpt);
+        selectEl.innerHTML=''; selectEl.appendChild(frag);
+        selectEl.addEventListener('change',()=>{
+          const isCustom = selectEl.value==='__custom';
+          if(customEl){ customEl.classList.toggle('hidden', !isCustom); if(isCustom) customEl.focus(); }
+        });
+      }
+
+      const sourceItems = unique([ ...defaults.sources, ...loadList(STORAGE.sources) ]);
+      const procItems = unique([ ...defaults.processors, ...loadList(STORAGE.processors) ]);
+      populateSelect(sourceSel, sourceItems, sourceCustomEl);
+      populateSelect(procSel, procItems, procCustomEl);
+
+      function setMsg(text, ok){ if(!msgEl) return; msgEl.textContent = text||''; msgEl.className = 'text-xs ' + (ok ? 'text-emerald-300' : 'text-amber-300'); }
+
+      btn.addEventListener('click', async ()=>{
+        try {
+          await ensureApi();
+          const date = (dateEl?.value || '').trim();
+          const source = (sourceSel?.value === '__custom' ? (sourceCustomEl?.value||'').trim() : (sourceSel?.value||'').trim());
+          const processor = (procSel?.value === '__custom' ? (procCustomEl?.value||'').trim() : (procSel?.value||'').trim());
+          const amount = Number(amountEl?.value || 0);
+          const fees = Number(feesEl?.value || 0);
+          const notes = (notesEl?.value || '').trim();
+
+          if (!date) return setMsg('Please select a date', false);
+          if (!isFinite(amount) || amount <= 0) return setMsg('Amount must be greater than 0', false);
+          if (sourceSel?.value==='__custom' && !source) return setMsg('Enter a custom source', false);
+          if (procSel?.value==='__custom' && !processor) return setMsg('Enter a custom processor', false);
+
+          const isEditing = !!editingId;
+          const payload = isEditing ? { id: editingId, date, source, processor, amount, fees, notes } : { date, source, processor, amount, fees, notes };
+          const saved = await API.income.upsert(payload);
+          setMsg(isEditing ? 'Income updated.' : 'Income added.', true);
+
+          // Persist custom values for reuse
+          if (source && (!defaults.sources.includes(source))) {
+            const list = unique([ ...loadList(STORAGE.sources), source ]); saveList(STORAGE.sources, list); populateSelect(sourceSel, unique([ ...defaults.sources, ...list ]), sourceCustomEl); sourceSel.value = source; }
+          if (processor && (!defaults.processors.includes(processor))) {
+            const list = unique([ ...loadList(STORAGE.processors), processor ]); saveList(STORAGE.processors, list); populateSelect(procSel, unique([ ...defaults.processors, ...list ]), procCustomEl); procSel.value = processor; }
+
+          // Refresh data and UI
+          await loadData();
+          const d = new Date(saved.date);
+          if (refs.startDate.value && new Date(refs.startDate.value) > d) refs.startDate.valueAsDate = d;
+          if (refs.endDate.value && new Date(refs.endDate.value) < d) refs.endDate.valueAsDate = d;
+          applyFilters();
+
+          // Clear minimal inputs for next add
+          amountEl.value = '';
+          feesEl.value = '';
+          notesEl.value = '';
+          if (sourceSel?.value==='__custom' && sourceCustomEl) sourceCustomEl.value='';
+          if (procSel?.value==='__custom' && procCustomEl) procCustomEl.value='';
+
+          // Exit edit mode if we were editing
+          if (isEditing) {
+            editingId = null;
+            const addBtn = document.getElementById('btnAddIncome');
+            const cancelBtn = document.getElementById('btnCancelEdit');
+            if (addBtn) {
+              addBtn.textContent = 'Add';
+              addBtn.classList.remove('bg-blue-600','hover:bg-blue-500');
+              addBtn.classList.add('bg-emerald-600','hover:bg-emerald-500');
+            }
+            if (cancelBtn) cancelBtn.classList.add('hidden');
+          }
+        } catch (err) {
+          console.error(err);
+          setMsg('Failed to add income. Check server connection.', false);
+        }
+      });
+    })();
+    // header sort handled above
+
+    bootstrap();
   </script>
 </body>
 </html>
