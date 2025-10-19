@@ -26,7 +26,7 @@ RUN mkdir -p /data
 
 EXPOSE 3000
 
-LABEL org.opencontainers.image.title="Mellow Labs Dashboard" \
+LABEL org.opencontainers.image.title="Mellow Biz" \
       org.opencontainers.image.version="${APP_VERSION}" \
       org.opencontainers.image.source="https://github.com/${GITHUB_REPOSITORY}"
 

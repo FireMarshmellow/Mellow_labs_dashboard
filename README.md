@@ -1,4 +1,4 @@
-# Mellow Labs Dashboard
+# Mellow Biz
 
 A lightweight local dashboard for tracking income, expenses and payroll, with a summary page and simple HTTP API. The repo includes a browser-only front end (HTML + Tailwind + Chart.js) and a minimal backend you can run via Node.js (`server.js`) or Python (`server.py`).
 
@@ -42,7 +42,7 @@ If you prefer a reproducible Node setup, create a minimal `package.json` like:
 
 ```
 {
-  "name": "mellow-labs-dashboard",
+  "name": "mellow-biz",
   "private": true,
   "type": "module",
   "scripts": {
@@ -80,8 +80,8 @@ Local/dev (build from source)
 
 Production (run published image)
 1) Copy `.env.example` to `.env` and edit:
-   - `IMAGE=ghcr.io/<your-ghcr-user-or-org>/<repo>:latest` (or a pinned tag)
-   - `HOST_DATA_PATH=/srv/mellow-labs-dashboard/data` (or leave empty to use a named volume)
+   - `IMAGE=ghcr.io/<your-ghcr-user-or-org>/mellow_biz:latest` (or a pinned tag)
+   - `HOST_DATA_PATH=/srv/mellow-biz/data` (or leave empty to use a named volume)
    - `PORT=3000`
    - `APP_VERSION=latest`
 2) Start:
@@ -92,9 +92,9 @@ Production (run published image)
 Publish image automatically (GHCR)
 - Push to `main` or create a tag `vX.Y.Z`.
 - CI builds multi-arch images (linux/amd64, linux/arm64) and publishes:
-  - `ghcr.io/<owner>/<repo>:latest`
-  - `ghcr.io/<owner>/<repo>:vX.Y.Z` (for tags)
-  - `ghcr.io/<owner>/<repo>:sha-<commit>`
+  - `ghcr.io/<owner>/mellow_biz:latest`
+  - `ghcr.io/<owner>/mellow_biz:vX.Y.Z` (for tags)
+  - `ghcr.io/<owner>/mellow_biz:sha-<commit>`
 - Optional: set `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` to mirror to Docker Hub.
 
 Synology NAS (variant)

@@ -3,7 +3,7 @@ version: "3.9"
 services:
   app:
     image: ${IMAGE}
-    container_name: mellow-labs-dashboard
+    container_name: mellow-biz
     ports:
       - "${PORT:-3000}:3000"
     environment:
@@ -17,4 +17,3 @@ services:
 volumes:
   app-data:
     driver: local
-

@@ -3,8 +3,8 @@ version: "3.9"
 services:
   app:
     build: .
-    image: mellow-labs-dashboard:local
-    container_name: mellow-labs-dashboard
+    image: mellow-biz:local
+    container_name: mellow-biz
     ports:
       - "3000:3000"
     environment:

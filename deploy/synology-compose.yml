@@ -1,9 +1,9 @@
 version: "3.9"
 
 services:
-  mellow-labs-dashboard:
+  mellow-biz:
     image: ${IMAGE}
-    container_name: mellow-labs-dashboard
+    container_name: mellow-biz
     ports:
       - "3000:3000"
     environment:
