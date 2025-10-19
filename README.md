@@ -63,47 +63,49 @@ Then run `npm install` and `npm start`.
 ## Notes
 - Do not commit `finance.db` or other local database files; use the export/import features in Settings to move data between machines.
 
-## Docker + Synology NAS
-
-- Build image locally: `docker compose up -d --build`
-- App runs on `http://localhost:3000`. Data persists in a named volume.
+## Docker
 
 What’s included
 - `Dockerfile` for a Python/Flask container (port `3000`).
-- `docker-compose.yml` for local use with a persistent `/data` volume.
-- `deploy/synology-compose.yml` for Synology (includes Watchtower to auto-update).
-- GitHub Actions workflow `.github/workflows/docker-publish.yml` to publish images to GHCR on push.
+- `docker-compose.yml` for local dev (builds from source, named volume).
+- `docker-compose.prod.yml` for production (runs published image, configurable host path or named volume).
+- `docker-compose.watchtower.yml` optional auto-updater (any host, not Synology-specific).
+- `.env.example` with general variables for production compose.
+- GitHub Actions workflow `.github/workflows/docker-publish.yml` to publish images to GHCR (and optionally Docker Hub).
 
-Local/dev with Docker
-- Start: `docker compose up -d`
+Local/dev (build from source)
+- Start: `docker compose up -d --build`
 - Stop: `docker compose down`
-- Persistent DB path in container: `/data/finance.db` (mounted from volume).
+- Data persists in named volume `app-data` at `/data/finance.db` inside the container.
+
+Production (run published image)
+1) Copy `.env.example` to `.env` and edit:
+   - `IMAGE=ghcr.io/<your-ghcr-user-or-org>/<repo>:latest` (or a pinned tag)
+   - `HOST_DATA_PATH=/srv/mellow-labs-dashboard/data` (or leave empty to use a named volume)
+   - `PORT=3000`
+   - `APP_VERSION=latest`
+2) Start:
+   - `docker compose --env-file .env -f docker-compose.prod.yml up -d`
+3) Optional auto-update with Watchtower:
+   - `docker compose --env-file .env -f docker-compose.prod.yml -f docker-compose.watchtower.yml up -d`
 
 Publish image automatically (GHCR)
-- Push to the `main` branch to trigger the workflow.
-- The workflow publishes to `ghcr.io/<owner>/<repo>:latest` and `sha-<commit>`.
-- No extra secrets needed for GHCR; it uses `${{ secrets.GITHUB_TOKEN }}`.
-- Optional: set `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repo secrets to also publish to Docker Hub.
+- Push to `main` or create a tag `vX.Y.Z`.
+- CI builds multi-arch images (linux/amd64, linux/arm64) and publishes:
+  - `ghcr.io/<owner>/<repo>:latest`
+  - `ghcr.io/<owner>/<repo>:vX.Y.Z` (for tags)
+  - `ghcr.io/<owner>/<repo>:sha-<commit>`
+- Optional: set `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` to mirror to Docker Hub.
 
-Deploy on Synology (auto-updating)
-1) Copy `deploy/synology-compose.yml` and `deploy/.env.example` to your NAS.
-2) Rename `.env.example` to `.env` and edit:
-   - `IMAGE=ghcr.io/<your-ghcr-user-or-org>/<repo>:latest`
-   - `HOST_DATA_PATH=/volume1/docker/mellow-labs-dashboard/data` (or another folder)
-3) In Synology Container Manager (or via SSH), deploy:
-   - SSH: `cd /path/to/deploy && docker compose --env-file .env -f synology-compose.yml up -d`
-   - UI: Import the compose file and set the two env vars.
-4) The `watchtower` service checks every 15 minutes and upgrades the app when a new image is available, then prunes old images (`--cleanup`).
-
-Keep working and ship updates
-- Continue editing locally and push to `main`.
-- GitHub Actions builds and publishes a new image.
-- Synology’s Watchtower auto-pulls and restarts the app with zero manual steps.
+Synology NAS (variant)
+- You can use the general production compose files above, or the dedicated `deploy/synology-compose.yml` (includes Watchtower with `--registry-auth`).
+- For the dedicated file, copy `deploy/.env.example` to `deploy/.env` and edit `IMAGE` and `HOST_DATA_PATH`, then run:
+  - `docker compose --env-file deploy/.env -f deploy/synology-compose.yml up -d`
 
 App Version in Settings
 - The Settings page displays the app version from `/api/version`.
 - Docker images include `APP_VERSION` build arg (set by CI to the tag or `latest`).
-- For Synology, set `APP_VERSION` in `deploy/.env` (defaults to `latest`).
+- For general compose, set `APP_VERSION` in `.env`. For Synology, set it in `deploy/.env`.
 
 Data persistence and migration
 - Your DB lives on the NAS at `HOST_DATA_PATH` as `finance.db`.
