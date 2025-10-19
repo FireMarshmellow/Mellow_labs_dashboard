@@ -28,7 +28,7 @@
   <main class="max-w-6xl mx-auto p-6 space-y-8">
     <header class="hidden">
       <div class="flex items-center gap-3">
-        <svg class="w-9 h-9 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-9 h-9 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <div>
@@ -47,11 +47,17 @@
     </header>
     <nav class="bg-slate-800/50 rounded-2xl p-2 flex flex-wrap gap-2 text-sm">
       <a href="financial_summary.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Summary</a>
-      <a href="standalone_income_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500">Income</a>
+      <a href="standalone_income_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500">Income</a>
       <a href="standalone_expense_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Expenses</a>
       <a href="standalone_payroll_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Payroll</a>
       <a href="settings.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Settings</a>
+      <button id="btnToggleAddIncome" class="ml-auto px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 flex items-center gap-2" title="Add Income">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="hidden sm:inline">Add</span>
+      </button>
     </nav>
+    <!-- Mount point to place the Add Income dropdown directly under nav -->
+    <div id="addIncomeMount"></div>
 
     <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 relative z-50 overflow-visible">
       <div class="flex flex-col lg:flex-row lg:items-end gap-4">
@@ -80,7 +86,7 @@
             Search
             <input id="search" placeholder="Find by source, processor, notes..." class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
           </label>
-          <button id="btnApplyFilters" class="button-hover px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-sm h-fit mt-auto">
+          <button id="btnApplyFilters" class="button-hover px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-sm h-fit mt-auto">
             Apply
           </button>
         </div>
@@ -88,7 +94,7 @@
     </section>
 
     <!-- Add Income Form -->
-    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4">
+    <section id="addIncomeSection" class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 hidden">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold text-slate-100">Add Income</h2>
         <span class="text-xs text-slate-400">Create a new income entry</span>
@@ -121,7 +127,7 @@
           <input id="incomeNotes" type="text" placeholder="Optional notes" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
         </label>
         <div class="md:col-span-2 lg:col-span-1 flex items-end gap-2">
-          <button id="btnAddIncome" class="button-hover flex-1 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-sm">Add</button>
+          <button id="btnAddIncome" class="button-hover flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-sm">Add</button>
           <button id="btnCancelEdit" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm hidden">Cancel</button>
         </div>
       </div>
@@ -394,8 +400,8 @@
             data: [],
             fill: true,
             tension: 0.35,
-            borderColor: 'rgb(34,197,94)',
-            backgroundColor: 'rgba(34,197,94,0.25)',
+            borderColor: 'rgb(96,165,250)',
+            backgroundColor: 'rgba(96,165,250,0.25)',
             pointRadius: 2,
           }],
         },
@@ -498,14 +504,14 @@
         if (!addBtn || !cancelBtn) return;
         if (on) {
           addBtn.textContent = 'Save';
-          addBtn.classList.remove('bg-emerald-600','hover:bg-emerald-500');
+          addBtn.classList.remove('bg-blue-600','hover:bg-blue-500','bg-emerald-600','hover:bg-emerald-500');
           addBtn.classList.add('bg-blue-600','hover:bg-blue-500');
           cancelBtn.classList.remove('hidden');
         } else {
           editingId = null;
           addBtn.textContent = 'Add';
           addBtn.classList.remove('bg-blue-600','hover:bg-blue-500');
-          addBtn.classList.add('bg-emerald-600','hover:bg-emerald-500');
+          addBtn.classList.add('bg-blue-600','hover:bg-blue-500');
           cancelBtn.classList.add('hidden');
         }
       }
@@ -531,6 +537,13 @@
             const rec = state.all.find(r => r.id === id);
             if (!rec) return;
             try {
+              // Ensure Add Income section is visible when entering edit mode
+              const addSection = document.getElementById('addIncomeSection');
+              const toggleBtn = document.getElementById('btnToggleAddIncome');
+              if (addSection && addSection.classList.contains('hidden')) {
+                addSection.classList.remove('hidden');
+                if (toggleBtn) toggleBtn.classList.add('ring-2','ring-blue-300');
+              }
               if (dateEl) dateEl.value = rec.date || '';
               setSelectValue(sourceSel, sourceCustomEl, rec.source || '');
               setSelectValue(procSel, procCustomEl, rec.processor || '');
@@ -563,6 +576,34 @@
       applyFilters();
     });
     document.getElementById('btnApplyFilters').addEventListener('click', applyFilters);
+    // Ensure Add Income section is located just under the nav
+    (function mountAddIncomeSection(){
+      const mount = document.getElementById('addIncomeMount');
+      const section = document.getElementById('addIncomeSection');
+      if (mount && section) {
+        // Move the section right after the mount anchor (i.e., under the nav)
+        mount.insertAdjacentElement('afterend', section);
+      }
+    })();
+    // Toggle Add Income dropdown from nav button
+    (function initAddToggle(){
+      const toggleBtn = document.getElementById('btnToggleAddIncome');
+      const addSection = document.getElementById('addIncomeSection');
+      if (toggleBtn && addSection) {
+        toggleBtn.addEventListener('click', () => {
+          const isHidden = addSection.classList.contains('hidden');
+          if (isHidden) {
+            addSection.classList.remove('hidden');
+            toggleBtn.classList.add('ring-2','ring-blue-300');
+            const first = document.getElementById('incomeDate') || document.getElementById('incomeSourceSelect');
+            if (first) first.focus();
+          } else {
+            addSection.classList.add('hidden');
+            toggleBtn.classList.remove('ring-2','ring-blue-300');
+          }
+        });
+      }
+    })();
     refs.quickSelect.addEventListener('change', () => {
       setQuickRange(refs.quickSelect.value);
       applyFilters();
@@ -666,9 +707,17 @@
             if (addBtn) {
               addBtn.textContent = 'Add';
               addBtn.classList.remove('bg-blue-600','hover:bg-blue-500');
-              addBtn.classList.add('bg-emerald-600','hover:bg-emerald-500');
+              addBtn.classList.add('bg-blue-600','hover:bg-blue-500');
             }
             if (cancelBtn) cancelBtn.classList.add('hidden');
+          }
+
+          // Hide the Add Income section after a successful add when not editing
+          if (!isEditing) {
+            const addSection = document.getElementById('addIncomeSection');
+            const toggleBtn = document.getElementById('btnToggleAddIncome');
+            if (addSection) addSection.classList.add('hidden');
+            if (toggleBtn) toggleBtn.classList.remove('ring-2','ring-blue-300');
           }
         } catch (err) {
           console.error(err);

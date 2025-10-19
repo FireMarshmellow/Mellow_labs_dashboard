@@ -3,551 +3,706 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Expenses — Standalone</title>
-  <!-- Tailwind via CDN -->
+  <title>Expenses Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+  <script src="shared_api.js"></script>
   <meta name="color-scheme" content="dark light" />
   <style>
     :root { color-scheme: dark; }
-    /* Prevent table jumping when scrollbar appears */
     html { overflow-y: scroll; }
-    /* Simple truncation helper for notes */
-    .truncate-26ch { max-width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    /* Numeric input spinner remove (webkit) */
-    input[type=number]::-webkit-outer-spin-button,
-    input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type=number] { -moz-appearance: textfield; }
-
-    /* Enhanced UI Styles */
-    .transition-all { transition: all 0.2s ease-in-out; }
-    
-    /* Form inputs styling */
-    input, select, textarea {
-      transition: all 0.2s ease;
-      border: 1px solid transparent;
-    }
-    
-    input:hover, select:hover, textarea:hover {
-      border-color: rgba(148, 163, 184, 0.2);
-    }
-    
-    input:focus, select:focus, textarea:focus {
-      border-color: #3b82f6;
-      outline: none;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-    }
-
-    /* Table row hover effect */
-    tr:hover:not(:first-child) {
-      background-color: rgba(148, 163, 184, 0.05);
-    }
-
-    /* Button hover animations */
-    .button-hover {
-      transition: all 0.2s ease;
-      transform: translateY(0);
-    }
-    
-    .button-hover:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    }
-
-    /* Card hover effects */
-    .card-hover {
-      transition: all 0.3s ease;
-    }
-    
-    .card-hover:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-      width: 8px;
-      height: 8px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: rgba(148, 163, 184, 0.1);
-      border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.3);
-      border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(148, 163, 184, 0.4);
-    }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+    .button-hover { transition: all 0.2s ease; }
+    .button-hover:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: rgba(148,163,184,0.1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.35); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.55); }
+    table tbody tr:hover { background: rgba(148,163,184,0.08); }
   </style>
 </head>
-<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen">
+<body class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-slate-100 min-h-screen">
   <main class="max-w-6xl mx-auto p-6 space-y-8">
-    <header class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover mb-6">
+    <header class="hidden">
       <div class="flex items-center gap-3">
-        <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-9 h-9 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
         </svg>
-        <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-500 to-blue-300 bg-clip-text text-transparent">Expenses</h1>
-      </div>
-      <div class="flex gap-3">
-        <button id="btnExport" class="button-hover text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-          </svg>
-          Export CSV
-        </button>
-        <label class="button-hover text-sm px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 cursor-pointer flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-          </svg>
-          Import CSV<input id="fileImport" type="file" accept=".csv,text/csv" class="hidden" />
-        </label>
-        <button id="btnClear" class="button-hover text-sm px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-          </svg>
-          Clear All
-        </button>
-      </div>
-    </header>
-
-    <!-- Form Card -->
-    <section class="p-6 rounded-2xl bg-slate-800/90 max-w-3xl shadow-lg backdrop-blur-sm card-hover mx-auto">
-      <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
-        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-        </svg>
-        New Expense
-      </h2>
-      <form id="expenseForm" class="grid gap-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div>
-            <label for="date" class="text-xs text-slate-300">Date</label>
-            <input id="date" type="date" name="date" required class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
-          </div>
-          <div>
-            <label class="text-xs text-slate-300">Category</label>
-            <div class="flex gap-2">
-              <select id="category" name="category" class="flex-1 bg-slate-900 rounded px-2.5 py-1.5 text-sm"></select>
-              <button id="btnAddCategory" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600" title="Add category" type="button">Add</button>
-            </div>
-          </div>
-          <div>
-            <label for="seller" class="text-xs text-slate-300">Seller</label>
-            <input id="seller" name="seller" required class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
-          </div>
-          <div>
-            <label for="items" class="text-xs text-slate-300">Item(s)</label>
-            <input id="items" name="items" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" placeholder="What you bought" />
-          </div>
-          <div>
-            <label for="orderNumber" class="text-xs text-slate-300">Order #</label>
-            <input id="orderNumber" name="orderNumber" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
-          </div>
-          <div>
-            <label for="total" class="text-xs text-slate-300">Total Amount (£)</label>
-            <input id="total" type="number" step="0.01" min="0" name="total" required class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" />
-          </div>
-          <div>
-            <label for="notes" class="text-xs text-slate-300">Notes</label>
-            <textarea id="notes" name="notes" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm" rows="2"></textarea>
-          </div>
-          <div>
-            <label for="source" class="text-xs text-slate-300">Source</label>
-            <select id="source" name="source" class="w-full bg-slate-900 rounded px-2.5 py-1.5 text-sm">
-              <option value="Amazon">Amazon</option>
-              <option value="AliExpress">AliExpress</option>
-              <option value="eBay">eBay</option>
-              <option value="Custom">Custom</option>
-            </select>
-          </div>
-          <div class="col-span-full sm:col-span-1">
-            <button class="w-full py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-sm" type="submit">Add Expense</button>
-          </div>
+        <div>
+          <h1 class="text-3xl font-bold text-white">Expenses Dashboard</h1>
+          <p class="text-sm text-slate-300">Track spending patterns, vendors, and categories.</p>
         </div>
-      </form>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button id="btnRefresh" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5 19A9 9 0 1119 5"></path>
+          </svg>
+          Refresh
+        </button>
+        </div>
+    </header>
+    <nav class="bg-slate-800/50 rounded-2xl p-2 flex flex-wrap gap-2 text-sm">
+      <a href="financial_summary.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Summary</a>
+      <a href="standalone_income_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Income</a>
+      <a href="standalone_expense_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500">Expenses</a>
+      <a href="standalone_payroll_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Payroll</a>
+      <a href="settings.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Settings</a>
+      <button id="btnToggleAddExpense" class="ml-auto px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 flex items-center gap-2" title="Add Expense">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="hidden sm:inline">Add</span>
+      </button>
+    </nav>
+    <div id="addExpenseMount"></div>
+
+    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 relative z-50 overflow-visible">
+      <div class="flex flex-col lg:flex-row lg:items-end gap-4">
+        <div class="flex flex-wrap gap-4">
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Start Date
+            <input id="startDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            End Date
+            <input id="endDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Quick Range
+            <select id="quickSelect" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm">
+              <option value="1m">Last Month</option>
+              <option value="3m">Last 3 Months</option>
+              <option value="6m">Last 6 Months</option>
+              <option value="1y">Last Year</option>
+              <option value="all">All Time</option>
+            </select>
+          </label>
+        </div>
+        <div class="flex flex-1 gap-3">
+          <label class="flex-1 text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+            Search
+            <input id="search" placeholder="Find by vendor, category, notes..." class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          </label>
+          <button id="btnApplyFilters" class="button-hover px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm h-fit mt-auto">
+            Apply
+          </button>
+        </div>
+      </div>
     </section>
 
-    <!-- Table Card -->
-    <section class="p-6 rounded-2xl bg-slate-800/90 shadow-lg backdrop-blur-sm card-hover max-w-[1160px] mx-auto">
-      <div class="flex flex-col sm:flex-row gap-4 sm:items-center justify-between mb-6">
-        <div class="flex items-center gap-4">
-          <div class="bg-slate-700/50 rounded-lg p-3 text-center">
-            <div class="text-xs text-slate-400 mb-1">Entries</div>
-            <div class="text-xl font-semibold text-blue-400" id="count">0</div>
-          </div>
-          <div class="bg-slate-700/50 rounded-lg p-3 text-center">
-            <div class="text-xs text-slate-400 mb-1">Total</div>
-            <div class="text-xl font-semibold text-green-400" id="sum">£0.00</div>
-          </div>
-        </div>
-        <div class="flex gap-4 text-sm">
-          <label class="flex items-center gap-2 bg-slate-700/30 rounded-lg px-4 py-2">
-            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-            </svg>
-            <input id="filter" placeholder="Filter expenses..." class="bg-transparent border-none focus:ring-0 px-2 py-1 w-48" />
-          </label>
-          <label class="flex items-center gap-2 bg-slate-700/30 rounded-lg px-4 py-2">
-            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path>
-            </svg>
-            <select id="sortBy" class="bg-transparent border-none focus:ring-0 px-2 py-1">
-              <option value="date desc">Latest First</option>
-              <option value="date asc">Oldest First</option>
-              <option value="amount desc">Highest Amount</option>
-              <option value="amount asc">Lowest Amount</option>
-            </select>
-          </label>
+    <!-- Add Expense Form -->
+    <section id="addExpenseSection" class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 hidden">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-slate-100">Add Expense</h2>
+        <span class="text-xs text-slate-400">Create a new expense entry</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Date
+          <input id="expDate" type="date" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Category
+          <select id="expCategorySelect" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm"></select>
+          <input id="expCategoryCustom" type="text" placeholder="Custom category" class="mt-2 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm hidden" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Vendor
+          <input id="expSeller" type="text" placeholder="e.g. eBay" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Source
+          <select id="expSourceSelect" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm"></select>
+          <input id="expSourceCustom" type="text" placeholder="Custom source" class="mt-2 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm hidden" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-2">
+          Item(s)
+          <input id="expItems" type="text" placeholder="What you bought" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Order #
+          <input id="expOrder" type="text" placeholder="#" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Total
+          <input id="expTotal" type="number" step="0.01" min="0" placeholder="0.00" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-3">
+          Notes
+          <input id="expNotes" type="text" placeholder="Optional notes" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <div class="md:col-span-3 flex items-end gap-2">
+          <button id="btnAddExpense" class="button-hover flex-1 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm">Add</button>
+          <button id="btnCancelExpenseEdit" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm hidden">Cancel</button>
         </div>
       </div>
+      <p id="addExpenseMsg" class="text-xs text-slate-400"></p>
+    </section>
+
+    <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Total Spend</p>
+        <p id="statTotal" class="text-2xl font-semibold text-rose-300">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Average Spend</p>
+        <p id="statAverage" class="text-2xl font-semibold text-slate-100">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Largest Purchase</p>
+        <p id="statLargest" class="text-2xl font-semibold text-amber-300">£0.00</p>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Vendors</p>
+        <p id="statVendors" class="text-2xl font-semibold text-slate-100">0</p>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-slate-800/60 rounded-2xl p-6 card-hover">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-slate-100">Spending Timeline</h2>
+          <span class="text-xs text-slate-400">Total per day</span>
+        </div>
+        <div class="relative h-72">
+          <canvas id="timelineChart" class="!h-full !w-full"></canvas>
+        </div>
+      </div>
+      <div class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-6">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-slate-100">Category Breakdown</h2>
+            <span class="text-xs text-slate-400">Top categories</span>
+          </div>
+          <div class="relative h-56">
+            <canvas id="categoryChart" class="!h-full !w-full"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-slate-100">Vendor Ranking</h2>
+            <span class="text-xs text-slate-400">Top vendors by spend</span>
+          </div>
+          <div class="relative h-56">
+            <canvas id="vendorChart" class="!h-full !w-full"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-slate-100">Expense Transactions</h2>
+          <p class="text-xs text-slate-400" id="tableSummary">Showing 0 entries</p>
+        </div>
+
+      </div>
       <div class="overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead>
-            <tr class="text-left text-slate-400 border-b border-slate-700/50">
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[100px]">Date</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[120px]">Category</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[140px]">Seller</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[140px]">Item(s)</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[100px]">Order #</th>
-              <th class="py-4 px-3 font-medium text-right whitespace-nowrap w-[100px]">Total</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[120px]">Notes</th>
-              <th class="py-4 px-3 font-medium whitespace-nowrap w-[100px]">Source</th>
-              <th class="py-4 px-3 font-medium text-right whitespace-nowrap w-[140px]">Actions</th>
+        <table class="min-w-full text-sm">
+          <thead class="text-xs uppercase text-slate-400 border-b border-slate-700/60">
+            <tr>
+              <th class="py-3 px-3 text-left"> </th>
+              <th class="py-3 px-3 text-left cursor-pointer hover:bg-slate-700/30" data-sort="date">Date</th>
+              <th class="py-3 px-3 text-left cursor-pointer hover:bg-slate-700/30" data-sort="category">Category</th>
+              <th class="py-3 px-3 text-left" data-sort="items">Item</th>
+              <th class="py-3 px-3 text-right cursor-pointer hover:bg-slate-700/30" data-sort="total">Total</th>
             </tr>
           </thead>
-          <tbody id="tbody"></tbody>
+          <tbody id="tableBody" class="divide-y divide-slate-700/40"></tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <template id="rowTpl">
-    <tr class="border-t border-slate-700/50 transition-colors">
-      <td class="py-4 px-3 whitespace-nowrap" data-k="date"></td>
-      <td class="px-3"><span class="px-2 py-1 rounded-full text-xs bg-slate-700/50 inline-block max-w-[110px] truncate" data-k="category"></span></td>
-      <td class="px-3 max-w-[140px] truncate" data-k="seller"></td>
-      <td class="px-3 max-w-[140px] truncate" data-k="items"></td>
-      <td class="px-3 whitespace-nowrap"><span class="text-xs text-slate-400" data-k="orderNumber"></span></td>
-      <td class="text-right px-3 font-medium whitespace-nowrap" data-k="totalFmt"></td>
-      <td class="px-3 max-w-[120px] truncate" title="" data-k="notes"></td>
-      <td class="px-3 whitespace-nowrap"><span class="text-xs px-2 py-1 rounded-full bg-blue-900/30 text-blue-300 inline-block max-w-[90px] truncate" data-k="source"></span></td>
-      <td class="text-right px-3 whitespace-nowrap">
-        <button class="button-hover text-xs px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-1 inline-flex" data-act="edit">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-          </svg>
-          Edit
-        </button>
-        <button class="button-hover text-xs px-3 py-1 rounded-lg bg-rose-700 hover:bg-rose-600 ml-2 flex items-center gap-1 inline-flex" data-act="del">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-          </svg>
-          Delete
-        </button>
-      </td>
-    </tr>
-  </template>
-
   <script>
-    // === Simple local persistence ===
-    const LS_KEY_DATA = 'expenses.v1';
-    const LS_KEY_CATS = 'expenseCategories.v1';
-
     const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+    const state = { all: [], filtered: [] };
 
-    /** @type {Array<{id:string,date:string,category:string,seller:string,orderNumber:string,total:number,notes:string}>} */
-    let DATA = loadJSON(LS_KEY_DATA, []);
-    /** @type {string[]} */
-    let CATS = loadJSON(LS_KEY_CATS, ['—', 'Supplies', 'Software', 'Travel', 'Materials', 'Services']);
+    const refs = {
+      // sorting via header toggles
+      startDate: document.getElementById('startDate'),
+      endDate: document.getElementById('endDate'),
+      quickSelect: document.getElementById('quickSelect'),
+      search: document.getElementById('search'),
+      sortBy: document.getElementById('sortBy'),
+      summary: document.getElementById('tableSummary'),
+      tableBody: document.getElementById('tableBody'),
+      statTotal: document.getElementById('statTotal'),
+      statAverage: document.getElementById('statAverage'),
+      statLargest: document.getElementById('statLargest'),
+      statVendors: document.getElementById('statVendors'),
+    };
 
-    // === Elements ===
-    const form = document.getElementById('expenseForm');
-    const tbody = document.getElementById('tbody');
-    const count = document.getElementById('count');
-    const sum = document.getElementById('sum');
-    const sortBy = document.getElementById('sortBy');
-    const filter = document.getElementById('filter');
-    const catSelect = document.getElementById('category');
+    let timelineChart;
+    let categoryChart;
+    let vendorChart;
+    let expEditingId = null;
 
-    // Prefill today's date
-    document.getElementById('date').valueAsDate = new Date();
+    let sortField = 'date';
+    let sortDir = 'desc';
 
-    // Populate categories
-    function renderCats() {
-      catSelect.innerHTML = '';
-      CATS.forEach((c, i) => {
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = c;
-        catSelect.appendChild(opt);
+    function updateSortIndicators(){
+  document.querySelectorAll('th[data-sort]').forEach(th=>{
+    const key = th.dataset.sort;
+    const base = th.getAttribute('data-label') || th.textContent.replace(/[??]\s*$/, '').trim();
+    th.setAttribute('data-label', base);
+    const active = key === sortField;
+    th.textContent = base + (active ? (sortDir==='asc' ? ' ?' : ' ?') : '');
+  });
+    }
+
+    document.addEventListener('DOMContentLoaded',()=>{
+      document.querySelectorAll('th[data-sort]').forEach(th=>{
+        th.addEventListener('click',()=>{
+          const key = th.dataset.sort;
+          if (sortField === key) sortDir = (sortDir==='asc'?'desc':'asc'); else { sortField = key; sortDir='desc'; }
+          updateSortIndicators();
+          applyFilters();
+        });
+      });
+    });
+
+    function mapRecord(rec) {
+      const total = Number(rec.total || rec.price || 0);
+      return {
+        id: rec.id,
+        date: rec.date,
+        category: rec.category || 'Uncategorised',
+        seller: rec.seller || rec.source || 'Unknown',
+        source: rec.source || rec.seller || '',
+        items: rec.items || '',
+        orderNumber: rec.orderNumber || '',
+        total,
+        notes: rec.notes || '',
+      };
+    }
+
+    async function ensureApi() {
+      if (!window.API) throw new Error('API helper missing');
+      if (!API.available) await API.init('');
+      if (!API.available) throw new Error('Backend unavailable');
+    }
+
+    async function migrateExpensesFromLocal(){
+      try{
+        const raw = localStorage.getItem('expenses.v1');
+        if(!raw) return 0; const arr = JSON.parse(raw||'[]'); if(!Array.isArray(arr) || !arr.length) return 0;
+        const existing = await API.expenses.list(); if((existing||[]).length) return 0;
+        let added=0; const keyOf = x=>[x.date,(x.seller||'').toLowerCase(),Number(x.total||0).toFixed(2),(x.orderNumber||'').toLowerCase()].join('|');
+        const seen = new Set(existing.map(keyOf));
+        for(const it of arr){ const rec={ id: it.id||Math.random().toString(36).slice(2)+Date.now().toString(36), date: it.date||'', category: it.category||'Imported', seller: it.seller||'', items: it.items||'', orderNumber: it.orderNumber||'', total: Number(it.total||0)||0, notes: it.notes||'', source: it.source||it.seller||'' }; if(!rec.date) continue; if(!seen.has(keyOf(rec))){ await API.expenses.upsert(rec); seen.add(keyOf(rec)); added++; } }
+        return added;
+      }catch{ return 0; }
+    }
+
+    async function loadData() {
+      await ensureApi();
+      let data = await API.expenses.list();
+      if(!data.length){ const migrated = await migrateExpensesFromLocal(); if(migrated>0) data = await API.expenses.list(); }
+      state.all = data.map(mapRecord);
+    }
+
+    function setQuickRange(value) {
+      if (!state.all.length) return;
+      const dates = state.all.map(r => new Date(r.date)).filter(d => !isNaN(d));
+      const end = dates.length ? new Date(Math.max(...dates)) : new Date();
+      const start = new Date(end);
+      switch (value) {
+        case '1m': start.setMonth(end.getMonth() - 1); break;
+        case '3m': start.setMonth(end.getMonth() - 3); break;
+        case '6m': start.setMonth(end.getMonth() - 6); break;
+        case '1y': start.setFullYear(end.getFullYear() - 1); break;
+        case 'all':
+          start.setTime(dates.length ? Math.min(...dates) : end.getTime());
+          break;
+      }
+      refs.startDate.valueAsDate = start;
+      refs.endDate.valueAsDate = end;
+    }
+
+    function applyFilters() {
+      const start = refs.startDate.value ? new Date(refs.startDate.value) : null;
+      const end = refs.endDate.value ? new Date(refs.endDate.value) : null;
+      const q = refs.search.value.trim().toLowerCase();
+
+      state.filtered = state.all.filter(rec => {
+        const d = new Date(rec.date);
+        if (start && d < start) return false;
+        if (end && d > end) return false;
+        if (!q) return true;
+        const haystack = [rec.category, rec.seller, rec.items, rec.notes, rec.orderNumber].join(' ').toLowerCase();
+        return haystack.includes(q);
+      });
+
+      state.filtered.sort((a, b) => {
+        let cmp = 0;
+        switch (sortField) {
+          case 'date': cmp = new Date(a.date) - new Date(b.date); break;
+          case 'total': cmp = (a.total||0) - (b.total||0); break;
+          case 'seller': cmp = (a.seller||'').localeCompare(b.seller||''); return sortDir==='asc'? cmp : -cmp;
+          case 'category': cmp = (a.category||'').localeCompare(b.category||''); return sortDir==='asc'? cmp : -cmp;
+          case 'items': cmp = (a.items||'').localeCompare(b.items||''); break;
+        }
+        return sortDir==='asc'? cmp : -cmp;
+      });
+
+      updateStats();
+      updateCharts();
+      updateSortIndicators();
+      renderTable();
+    }
+
+    function updateStats() {
+      const total = state.filtered.reduce((sum, rec) => sum + rec.total, 0);
+      const avg = state.filtered.length ? total / state.filtered.length : 0;
+      const largest = state.filtered.reduce((max, rec) => Math.max(max, rec.total), 0);
+      const vendors = new Set(state.filtered.map(rec => rec.seller || 'Unknown')).size;
+      refs.statTotal.textContent = gbp.format(total);
+      refs.statAverage.textContent = gbp.format(avg);
+      refs.statLargest.textContent = gbp.format(largest);
+      refs.statVendors.textContent = vendors.toString();
+    }
+
+    function updateCharts() {
+      const byDate = {};
+      const byCategory = {};
+      const byVendor = {};
+      for (const rec of state.filtered) {
+        byDate[rec.date] = (byDate[rec.date] || 0) + rec.total;
+        byCategory[rec.category] = (byCategory[rec.category] || 0) + rec.total;
+        byVendor[rec.seller] = (byVendor[rec.seller] || 0) + rec.total;
+      }
+
+      const dates = Object.keys(byDate).sort((a, b) => new Date(a) - new Date(b));
+      timelineChart.data.labels = dates;
+      timelineChart.data.datasets[0].data = dates.map(date => byDate[date]);
+      timelineChart.update();
+
+      const categories = Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      categoryChart.data.labels = categories.map(([label]) => label);
+      categoryChart.data.datasets[0].data = categories.map(([, value]) => value);
+      categoryChart.update();
+
+      const vendors = Object.entries(byVendor).sort((a, b) => b[1] - a[1]).slice(0, 8);
+      vendorChart.data.labels = vendors.map(([vendor]) => vendor);
+      vendorChart.data.datasets[0].data = vendors.map(([, value]) => value);
+      vendorChart.update();
+    }
+
+    function renderTable() {
+      refs.summary.textContent = `Showing ${state.filtered.length} entr${state.filtered.length === 1 ? 'y' : 'ies'}`;
+      refs.tableBody.innerHTML = state.filtered.map(rec => `
+        <tr class="transition-colors">
+          <td class="py-3 px-3 whitespace-nowrap text-slate-200">${rec.date}</td>
+          <td class="py-3 px-3 text-slate-100">${rec.category}</td>
+          <td class="py-3 px-3 text-slate-300">${rec.seller}</td>
+          <td class="py-3 px-3 text-slate-300">${rec.items || '—'}</td>
+          <td class="py-3 px-3 text-slate-400">${rec.orderNumber || '—'}</td>
+          <td class="py-3 px-3 text-right text-rose-300 font-medium">${gbp.format(rec.total)}</td>
+          <td class="py-3 px-3 text-slate-300">${rec.notes || '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function initCharts() {
+      timelineChart = new Chart(document.getElementById('timelineChart').getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Total Spend',
+            data: [],
+            tension: 0.35,
+            fill: true,
+            borderColor: 'rgb(248,113,113)',
+            backgroundColor: 'rgba(248,113,113,0.25)',
+            pointRadius: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: 'time', time: { unit: 'month' }, grid: { color: 'rgba(148,163,184,0.2)' } },
+            y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.1)' } },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${gbp.format(ctx.parsed.y)}` } },
+          },
+        },
+      });
+
+      categoryChart = new Chart(document.getElementById('categoryChart').getContext('2d'), {
+        type: 'doughnut',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: [
+          'rgba(244,114,182,0.8)',
+          'rgba(248,113,113,0.8)',
+          'rgba(251,191,36,0.8)',
+          'rgba(134,239,172,0.8)',
+          'rgba(192,132,252,0.8)',
+          'rgba(96,165,250,0.8)',
+          'rgba(148,163,184,0.8)',
+          'rgba(233,196,106,0.8)',
+          'rgba(244,162,97,0.8)',
+          'rgba(231,111,81,0.8)',
+        ] }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#cbd5f5', boxWidth: 12 } },
+            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${gbp.format(ctx.parsed)}` } },
+          },
+        },
+      });
+
+      vendorChart = new Chart(document.getElementById('vendorChart').getContext('2d'), {
+        type: 'bar',
+        data: { labels: [], datasets: [{
+          label: 'Spend',
+          data: [],
+          backgroundColor: 'rgba(248,113,113,0.65)',
+          borderColor: 'rgba(248,113,113,0.9)',
+          borderWidth: 1,
+        }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { ticks: { color: '#cbd5f5' }, grid: { display: false } },
+            y: { beginAtZero: true, grid: { color: 'rgba(148,163,184,0.1)' } },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${gbp.format(ctx.parsed.y)}` } },
+          },
+        },
       });
     }
 
-    function saveAll() {
-      localStorage.setItem(LS_KEY_DATA, JSON.stringify(DATA));
-      localStorage.setItem(LS_KEY_CATS, JSON.stringify(CATS));
+    // Override table renderer to include compact row + expandable details
+    function renderTable() {
+      refs.summary.textContent = `Showing ${state.filtered.length} entr${state.filtered.length === 1 ? 'y' : 'ies'}`;
+      refs.tableBody.innerHTML = state.filtered.map(rec => `
+        <tr class="transition-colors" data-row-id="${rec.id}">
+          <td class="py-3 px-3"><button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-toggle="details" data-id="${rec.id}">Details</button></td>
+          <td class="py-3 px-3 whitespace-nowrap text-slate-200">${rec.date}</td>
+          <td class="py-3 px-3 text-slate-100">${rec.category}</td>
+          <td class="py-3 px-3 text-slate-300">${rec.items || 'N/A'}</td>
+          <td class="py-3 px-3 text-right text-rose-300 font-medium">${gbp.format(rec.total)}</td>
+        </tr>
+        <tr id="exp-details-${rec.id}" class="hidden bg-slate-800/40"><td colspan="5" class="px-3 py-3">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+            <div><span class="text-slate-400">Seller:</span> <span class="text-slate-200">${rec.seller||'N/A'}</span></div>
+            <div><span class="text-slate-400">Order #:</span> <span class="text-slate-200">${rec.orderNumber||'N/A'}</span></div>
+            <div><span class="text-slate-400">Source:</span> <span class="text-slate-200">${rec.source||'N/A'}</span></div>
+            <div class="md:col-span-1 md:col-start-4 text-right">
+              <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-action="edit" data-id="${rec.id}">Edit</button>
+              <button class="ml-2 px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-xs" data-action="delete" data-id="${rec.id}">Delete</button>
+            </div>
+            <div class="md:col-span-4"><span class="text-slate-400">Notes:</span> <span class="text-slate-200">${rec.notes||'N/A'}</span></div>
+          </div>
+        </td></tr>
+      `).join('');
     }
 
-    function loadJSON(key, def) {
-      try { const v = JSON.parse(localStorage.getItem(key)); return Array.isArray(def) && !Array.isArray(v) ? def : (v ?? def); } catch { return def; }
-    }
+    // Add/Edit/Delete handlers for expenses
+    (function initExpenseActions(){
+      const dateEl = document.getElementById('expDate');
+      const categorySel = document.getElementById('expCategorySelect');
+      const categoryCustomEl = document.getElementById('expCategoryCustom');
+      const sellerEl = document.getElementById('expSeller');
+      const sourceSel = document.getElementById('expSourceSelect');
+      const sourceCustomEl = document.getElementById('expSourceCustom');
+      const itemsEl = document.getElementById('expItems');
+      const orderEl = document.getElementById('expOrder');
+      const totalEl = document.getElementById('expTotal');
+      const notesEl = document.getElementById('expNotes');
+      const addBtn = document.getElementById('btnAddExpense');
+      const cancelBtn = document.getElementById('btnCancelExpenseEdit');
+      const msgEl = document.getElementById('addExpenseMsg');
 
-    function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
-
-    function sanitizeCSV(s) {
-      if (s == null) return '';
-      const str = String(s);
-      return /[",\n]/.test(str) ? '"' + str.replaceAll('"', '""') + '"' : str;
-    }
-
-    function toCSV(rows) {
-      const header = ['Date','Category','Seller','Item(s)','Order #','TotalGBP','Notes','Source'];
-      const lines = [header.join(',')];
-      for (const r of rows) {
-        lines.push([
-          sanitizeCSV(r.date),
-          sanitizeCSV(r.category),
-          sanitizeCSV(r.seller),
-          sanitizeCSV(r.items || ''), // Include the "Item(s)" field
-          sanitizeCSV(r.orderNumber || ''),
-          (Number(r.total) || 0).toFixed(2),
-          sanitizeCSV(r.notes || ''),
-          sanitizeCSV(r.source || '') // Include the "Source" field
-        ].join(','));
-      }
-      return lines.join('\n');
-    }
-
-    function parseCSV(text) {
-      // Minimal CSV parser: supports quoted fields and commas
-      const rows = [];
-      let i = 0, field = '', row = [], inQuotes = false;
-      while (i < text.length) {
-        const ch = text[i++];
-        if (inQuotes) {
-          if (ch === '"') {
-            if (text[i] === '"') { field += '"'; i++; }
-            else { inQuotes = false; }
-          } else field += ch;
-        } else {
-          if (ch === '"') inQuotes = true;
-          else if (ch === ',') { row.push(field); field = ''; }
-          else if (ch === '\n' || ch === '\r') {
-            if (field !== '' || row.length) { row.push(field); rows.push(row); row = []; field = ''; }
-          } else field += ch;
-        }
-      }
-      if (field !== '' || row.length) { row.push(field); rows.push(row); }
-      return rows.filter(r => r.length > 1);
-    }
-
-    function csvToExpenses(csvText) {
-      const rows = parseCSV(csvText);
-      if (!rows.length) return [];
-      const header = rows[0].map(h => h.trim().toLowerCase());
-      const idx = {
-        date: header.indexOf('date'),
-        category: header.indexOf('category'),
-        seller: header.indexOf('seller'),
-        items: header.indexOf('item(s)'), // Added "Item(s)" field
-        order: header.findIndex(h => h.startsWith('order')),
-        total: header.findIndex(h => h.startsWith('total')),
-        notes: header.indexOf('notes'),
-        source: header.indexOf('source') // Added "Source" field
+      // Helpers for dropdowns + custom values
+      const STORAGE = {
+        sources: 'expenses.customSources.v1',
+        categories: 'expenses.customCategories.v1',
       };
-      const out = [];
-      for (let r = 1; r < rows.length; r++) {
-        const row = rows[r];
-        if (!row[idx.date]) continue;
-        out.push({
-          id: uid(),
-          date: row[idx.date] || '',
-          category: row[idx.category] || '—',
-          seller: row[idx.seller] || '',
-          items: row[idx.items] || '', // Include "Item(s)" data
-          orderNumber: row[idx.order] || '',
-          total: Number(String(row[idx.total] || '0').replace(/[^0-9.\-]/g, '')) || 0,
-          notes: row[idx.notes] || '',
-          source: row[idx.source] || '' // Include "Source" data
+      const defaults = {
+        sources: ['eBay','Amazon','AliExpress'],
+        categories: ['Tools','Equipment','Materials','Electronics','Travel']
+      };
+      function loadList(key){ try{ const v = JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(v)?v:[]; }catch{ return []; } }
+      function saveList(key, arr){ try{ localStorage.setItem(key, JSON.stringify(arr||[])); }catch{} }
+      function unique(arr){ const seen=new Set(); const out=[]; for(const s of arr){ const k=(s||'').trim(); if(!k) continue; const low=k.toLowerCase(); if(!seen.has(low)){ seen.add(low); out.push(k); } } return out; }
+      function populateSelect(selectEl, items, customEl){
+        if(!selectEl) return;
+        const frag = document.createDocumentFragment();
+        const placeholder = document.createElement('option'); placeholder.value=''; placeholder.textContent='Select...'; frag.appendChild(placeholder);
+        for(const it of items){ const o=document.createElement('option'); o.value=it; o.textContent=it; frag.appendChild(o); }
+        const customOpt=document.createElement('option'); customOpt.value='__custom'; customOpt.textContent='Custom...'; frag.appendChild(customOpt);
+        selectEl.innerHTML=''; selectEl.appendChild(frag);
+        selectEl.addEventListener('change',()=>{
+          const isCustom = selectEl.value==='__custom';
+          if(customEl){ customEl.classList.toggle('hidden', !isCustom); if(isCustom) customEl.focus(); }
         });
       }
-      return out;
-    }
+      function setSelectValue(selectEl, customEl, value){
+        if(!selectEl) return;
+        const val = String(value||'').trim();
+        let found=false;
+        for(let i=0;i<selectEl.options.length;i++){
+          const opt = selectEl.options[i];
+          if((opt.value||'').toLowerCase() === val.toLowerCase()){ selectEl.value = opt.value; found=true; break; }
+        }
+        if(!found){ selectEl.value='__custom'; if(customEl){ customEl.classList.remove('hidden'); customEl.value=val; } }
+        else if(customEl){ customEl.classList.add('hidden'); customEl.value=''; }
+      }
 
-    function render() {
-      // Filter & sort
-      const q = filter.value.trim().toLowerCase();
-      const [key, dir] = sortBy.value.split(' ');
-      const rows = DATA.filter(r =>
-        !q || [r.date, r.category, r.seller, r.items, r.orderNumber, r.notes, r.total] // Include "Item(s)" in filter
-          .join(' ').toLowerCase().includes(q)
-      ).sort((a,b)=>{
-        if (key === 'date') return (a.date < b.date ? -1: a.date > b.date ? 1 : 0) * (dir==='asc'?1:-1);
-        if (key === 'amount') return ((a.total||0) - (b.total||0)) * (dir==='asc'?1:-1);
-        return 0;
+      // Initial populate
+      populateSelect(categorySel, unique([ ...defaults.categories, ...loadList(STORAGE.categories) ]), categoryCustomEl);
+      populateSelect(sourceSel, unique([ ...defaults.sources, ...loadList(STORAGE.sources) ]), sourceCustomEl);
+
+      function setMsg(t, ok){ if(!msgEl) return; msgEl.textContent = t||''; msgEl.className = 'text-xs ' + (ok ? 'text-emerald-300' : 'text-amber-300'); }
+      function setEditMode(on){
+        if (!addBtn || !cancelBtn) return;
+        if (on) { addBtn.textContent='Save'; addBtn.classList.remove('bg-rose-600','hover:bg-rose-500'); addBtn.classList.add('bg-blue-600','hover:bg-blue-500'); cancelBtn.classList.remove('hidden'); }
+        else { expEditingId=null; addBtn.textContent='Add'; addBtn.classList.remove('bg-blue-600','hover:bg-blue-500'); addBtn.classList.add('bg-rose-600','hover:bg-rose-500'); cancelBtn.classList.add('hidden'); }
+      }
+      if (cancelBtn) cancelBtn.addEventListener('click', ()=> setEditMode(false));
+
+      if (addBtn) addBtn.addEventListener('click', async ()=>{
+        try{
+          await ensureApi();
+          const date = (dateEl?.value||'').trim();
+          const category = (categorySel?.value==='__custom' ? (categoryCustomEl?.value||'').trim() : (categorySel?.value||'').trim());
+          const seller = (sellerEl?.value||'').trim();
+          const items = (itemsEl?.value||'').trim();
+          const orderNumber = (orderEl?.value||'').trim();
+          const total = Number(totalEl?.value||0);
+          const notes = (notesEl?.value||'').trim();
+          if(!date) return setMsg('Please select a date', false);
+          if(!isFinite(total) || total<=0) return setMsg('Total must be greater than 0', false);
+          const source = (sourceSel?.value==='__custom' ? (sourceCustomEl?.value||'').trim() : (sourceSel?.value||'').trim());
+          if (categorySel?.value==='__custom' && !category) return setMsg('Enter a custom category', false);
+          if (sourceSel?.value==='__custom' && !source) return setMsg('Enter a custom source', false);
+          const payload = expEditingId ? { id: expEditingId, date, category, seller, items, orderNumber, total, notes, source } : { date, category, seller, items, orderNumber, total, notes, source };
+          const saved = await API.expenses.upsert(payload);
+          setMsg(expEditingId ? 'Expense updated.' : 'Expense added.', true);
+
+          // Persist custom values
+          if (category && !defaults.categories.includes(category)) {
+            const list = unique([ ...loadList(STORAGE.categories), category ]); saveList(STORAGE.categories, list); populateSelect(categorySel, unique([ ...defaults.categories, ...list ]), categoryCustomEl); categorySel.value = category; }
+          if (source && !defaults.sources.includes(source)) {
+            const list = unique([ ...loadList(STORAGE.sources), source ]); saveList(STORAGE.sources, list); populateSelect(sourceSel, unique([ ...defaults.sources, ...list ]), sourceCustomEl); sourceSel.value = source; }
+          await loadData();
+          const d = new Date(saved.date);
+          if (refs.startDate.value && new Date(refs.startDate.value) > d) refs.startDate.valueAsDate = d;
+          if (refs.endDate.value && new Date(refs.endDate.value) < d) refs.endDate.valueAsDate = d;
+          applyFilters();
+          // clear light fields
+          totalEl.value=''; notesEl.value='';
+          if (expEditingId) setEditMode(false);
+          // Hide the Add Expense section after a successful add when not editing
+          if (!expEditingId) {
+            const addSection = document.getElementById('addExpenseSection');
+            const toggleBtn = document.getElementById('btnToggleAddExpense');
+            if (addSection) addSection.classList.add('hidden');
+            if (toggleBtn) toggleBtn.classList.remove('ring-2','ring-rose-300');
+          }
+        }catch(err){ console.error(err); setMsg('Failed to save expense.', false); }
       });
 
-      // Tally
-      count.textContent = String(rows.length);
-      const totalSum = rows.reduce((acc, r) => acc + (Number(r.total)||0), 0);
-      sum.textContent = gbp.format(totalSum);
-
-      // Table
-      tbody.innerHTML = '';
-      const tpl = document.getElementById('rowTpl');
-      for (const r of rows) {
-        const tr = tpl.content.firstElementChild.cloneNode(true);
-        tr.querySelector('[data-k=date]').textContent = r.date || '';
-        tr.querySelector('[data-k=category]').textContent = r.category || '';
-        tr.querySelector('[data-k=seller]').textContent = r.seller || '';
-        tr.querySelector('[data-k=items]').textContent = r.items || ''; // Populate Item(s) column
-        tr.querySelector('[data-k=orderNumber]').textContent = r.orderNumber || '';
-        tr.querySelector('[data-k=totalFmt]').textContent = gbp.format(Number(r.total)||0);
-        const notesEl = tr.querySelector('[data-k=notes]');
-        notesEl.textContent = r.notes || '';
-        notesEl.title = r.notes || '';
-        tr.querySelector('[data-k=source]').textContent = r.source || ''; // Populate Source column
-        tr.dataset.id = r.id;
-        tbody.appendChild(tr);
-      }
-    }
-
-    function addExpenseFromForm(evt) {
-      evt.preventDefault();
-      const date = form.date.value;
-      const category = form.category.value || '—';
-      const seller = form.seller.value.trim();
-      const orderNumber = form.orderNumber.value.trim();
-      const total = Number(form.total.value);
-      const notes = form.notes.value.trim();
-      const source = form.source.value;
-      if (!date || !seller || isNaN(total)) return;
-      DATA.push({ id: uid(), date, category, seller, orderNumber, total, notes, source });
-      saveAll();
-      render();
-      exportCSV(); // Automatically save to CSV after adding an expense
-      form.reset();
-      form.date.valueAsDate = new Date();
-      form.category.value = category; // keep last cat
-      form.seller.focus();
-    }
-
-    function onTableClick(evt) {
-      const btn = evt.target.closest('button');
-      if (!btn) return;
-      const tr = btn.closest('tr');
-      const id = tr?.dataset?.id;
-      const idx = DATA.findIndex(r => r.id === id);
-      if (idx === -1) return;
-      const rec = DATA[idx];
-      if (btn.dataset.act === 'del') {
-        if (confirm('Delete this expense?')) {
-          DATA.splice(idx,1);
-          saveAll();
-          render();
+      if (refs.tableBody) refs.tableBody.addEventListener('click', async (e)=>{
+        const toggle = e.target.closest('[data-toggle="details"]');
+        if (toggle) { const tid = toggle.dataset.id; const row = document.getElementById('exp-details-'+tid); if(row) row.classList.toggle('hidden'); return; }
+        const btn = e.target.closest('button[data-action]'); if(!btn) return;
+        const id = btn.dataset.id; const action = btn.dataset.action;
+        if (action==='delete'){
+          if(!confirm('Delete this expense?')) return;
+          try{ await ensureApi(); const ok = await API.expenses.remove(id); if(ok){ await loadData(); applyFilters(); } }
+          catch(err){ console.error(err); alert('Failed to delete.'); }
+        } else if (action==='edit') {
+          const rec = state.all.find(r=>r.id===id); if(!rec) return;
+          try{
+            // Ensure Add Expense section is visible when entering edit mode
+            const addSection = document.getElementById('addExpenseSection');
+            const toggleBtn = document.getElementById('btnToggleAddExpense');
+            if (addSection && addSection.classList.contains('hidden')) {
+              addSection.classList.remove('hidden');
+              if (toggleBtn) toggleBtn.classList.add('ring-2','ring-rose-300');
+            }
+            if(dateEl) dateEl.value = rec.date||'';
+            setSelectValue(categorySel, categoryCustomEl, rec.category||'');
+            if(sellerEl) sellerEl.value = rec.seller||'';
+            setSelectValue(sourceSel, sourceCustomEl, rec.source||'');
+            if(itemsEl) itemsEl.value = rec.items||'';
+            if(orderEl) orderEl.value = rec.orderNumber||'';
+            if(totalEl) totalEl.value = String(rec.total||0);
+            if(notesEl) notesEl.value = rec.notes||'';
+            expEditingId = id;
+            setEditMode(true);
+          }catch(err){ console.error(err); }
         }
-      } else if (btn.dataset.act === 'edit') {
-        // very simple inline edit via prompts (keeps code light)
-        const date = prompt('Date (YYYY-MM-DD):', rec.date) || rec.date;
-        const category = prompt('Category:', rec.category) || rec.category;
-        const seller = prompt('Seller:', rec.seller) || rec.seller;
-        const orderNumber = prompt('Order #:', rec.orderNumber || '') ?? rec.orderNumber;
-        const total = Number(prompt('Total (£):', rec.total)) || rec.total;
-        const notes = prompt('Notes:', rec.notes || '') ?? rec.notes;
-        const source = prompt('Source:', rec.source || '') ?? rec.source;
-        Object.assign(rec, { date, category, seller, items, orderNumber, total, notes, source });
-        if (!CATS.includes(category)) { CATS.push(category); renderCats(); }
-        saveAll();
-        render();
+      });
+    })();
+
+    async function bootstrap() {
+      try {
+        await loadData();
+        if (!refs.startDate.value) setQuickRange('3m');
+        initCharts();
+        applyFilters();
+      } catch (err) {
+        console.error(err);
+        alert('Unable to load expense data. Please ensure the backend server is running.');
       }
     }
 
-    function exportCSV() {
-      const csv = toCSV(DATA);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
-      const d = new Date();
-      const fname = `expenses-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.csv`;
-      a.href = URL.createObjectURL(blob);
-      a.download = fname;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
-    }
-
-    function importCSV(file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const items = csvToExpenses(String(reader.result || ''));
-        if (!items.length) { alert('No rows found in CSV'); return; }
-        // merge, avoid duplicates by (date, seller, total, orderNumber)
-        const keyOf = r => [r.date,r.seller,Number(r.total).toFixed(2),r.orderNumber||''].join('|');
-        const existing = new Set(DATA.map(keyOf));
-        let added = 0;
-        for (const it of items) {
-          if (!existing.has(keyOf(it))) { DATA.push(it); added++; }
-          if (it.category && !CATS.includes(it.category)) CATS.push(it.category);
-        }
-        saveAll(); renderCats(); render();
-        alert(`Imported ${added} new row(s).`);
-      };
-      reader.readAsText(file);
-    }
-
-    function addCategoryFlow() {
-      const name = prompt('Add new expense category');
-      if (!name) return;
-      if (!CATS.includes(name)) {
-        CATS.push(name);
-        saveAll();
-        renderCats();
+    
+    document.getElementById('btnRefresh').addEventListener('click', async () => {
+      await loadData();
+      applyFilters();
+    });
+    document.getElementById('btnApplyFilters').addEventListener('click', applyFilters);
+    // Mount Add Expense under the nav
+    (function mountAddExpenseSection(){
+      const mount = document.getElementById('addExpenseMount');
+      const section = document.getElementById('addExpenseSection');
+      if (mount && section) mount.insertAdjacentElement('afterend', section);
+    })();
+    // Toggle Add Expense dropdown from nav button
+    (function initExpenseToggle(){
+      const toggleBtn = document.getElementById('btnToggleAddExpense');
+      const addSection = document.getElementById('addExpenseSection');
+      if (toggleBtn && addSection) {
+        toggleBtn.addEventListener('click', () => {
+          const isHidden = addSection.classList.contains('hidden');
+          if (isHidden) {
+            addSection.classList.remove('hidden');
+            toggleBtn.classList.add('ring-2','ring-rose-300');
+            const first = document.getElementById('expDate') || document.getElementById('expCategorySelect');
+            if (first) first.focus();
+          } else {
+            addSection.classList.add('hidden');
+            toggleBtn.classList.remove('ring-2','ring-rose-300');
+          }
+        });
       }
-      catSelect.value = name;
-    }
-
-    // Add event listener for the Source dropdown
-    const sourceSelect = document.getElementById('source');
-    sourceSelect.addEventListener('change', () => {
-      if (sourceSelect.value === 'Custom') {
-        const customSource = prompt('Enter custom source:');
-        if (customSource) {
-          // Add the custom source to the dropdown options
-          const customOption = document.createElement('option');
-          customOption.value = customSource;
-          customOption.textContent = customSource;
-          sourceSelect.appendChild(customOption);
-          sourceSelect.value = customSource; // Set the selected value to the custom source
-        } else {
-          // Reset to default if no input is provided
-          sourceSelect.value = '';
-        }
-      }
+    })();
+    refs.quickSelect.addEventListener('change', () => {
+      setQuickRange(refs.quickSelect.value);
+      applyFilters();
     });
+    refs.startDate.addEventListener('change', applyFilters);
+    refs.endDate.addEventListener('change', applyFilters);
+    refs.search.addEventListener('input', applyFilters);
+    
 
-    // === Event wiring ===
-    form.addEventListener('submit', addExpenseFromForm);
-    document.getElementById('btnAddCategory').addEventListener('click', addCategoryFlow);
-    document.getElementById('btnExport').addEventListener('click', exportCSV);
-    document.getElementById('btnClear').addEventListener('click', () => {
-      if (!confirm('This will clear ALL stored expenses and categories (keeps defaults). Continue?')) return;
-      DATA = [];
-      CATS = ['—', 'Supplies', 'Software', 'Travel', 'Meals', 'Services'];
-      saveAll(); renderCats(); render();
-    });
-    document.getElementById('fileImport').addEventListener('change', (e) => {
-      const f = e.target.files?.[0]; if (f) importCSV(f); e.target.value = '';
-    });
-    sortBy.addEventListener('change', render);
-    filter.addEventListener('input', render);
-    tbody.addEventListener('click', onTableClick);
-
-    // Initial paint
-    renderCats();
-    render();
+    bootstrap();
   </script>
 </body>
 </html>

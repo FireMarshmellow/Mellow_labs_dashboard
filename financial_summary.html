@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon"></script>
+  <script src="shared_api.js"></script>
   <meta name="color-scheme" content="dark light" />
   <style>
     :root { color-scheme: dark; }
@@ -34,35 +35,33 @@
   </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen">
-  <main class="max-w-7xl mx-auto p-6 space-y-8">
+  <main class="max-w-6xl mx-auto p-6 space-y-8">
     <!-- Header -->
-    <header class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+    <header class="hidden">
       <div class="flex items-center gap-3">
         <svg class="w-8 h-8 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
         </svg>
         <h1 class="text-3xl font-bold bg-gradient-to-r from-purple-500 to-purple-300 bg-clip-text text-transparent">Financial Summary</h1>
       </div>
-      <div class="flex gap-3">
-        <div class="flex items-center gap-4">
-          <label class="button-hover text-sm px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 cursor-pointer flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-            </svg>
-            Import Income<input id="incomeImport" type="file" accept=".csv" class="hidden" />
-          </label>
-          <label class="button-hover text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 cursor-pointer flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-            </svg>
-            Import Expenses<input id="expensesImport" type="file" accept=".csv" class="hidden" />
-          </label>
-        </div>
-      </div>
+      <div class="text-sm text-slate-400">Data syncs automatically with the backend database.</div>
     </header>
 
-    <!-- Date Range Selector -->
-    <section class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+    <!-- Navigation (separate pages) -->
+    <nav class="bg-slate-800/50 rounded-2xl p-2 flex flex-wrap gap-2 text-sm">
+      <a href="financial_summary.html" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500">Summary</a>
+      <a href="standalone_income_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Income</a>
+      <a href="standalone_expense_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Expenses</a>
+      <a href="standalone_payroll_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Payroll</a>
+      <a href="settings.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Settings</a>
+    </nav>
+
+    <!-- Summary content -->
+    
+    
+
+    <!-- Summary content is moved inside panel-summary at runtime to keep DOM simple for tabbing -->
+    <section id="summary-source" class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
       <div class="flex flex-wrap gap-4 items-end">
         <div>
           <label class="text-xs text-slate-300 block mb-1">Start Date</label>
@@ -84,11 +83,66 @@
           </select>
         </div>
         <button id="updateCharts" class="button-hover px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm">Update Charts</button>
+        <button id="btnCustomize" class="button-hover px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm">Customize</button>
+      </div>
+    </section>
+    <!-- Chart customization panel -->
+    <section id="customizeSection" class="bg-slate-800/50 p-5 rounded-2xl shadow-lg card-hover hidden">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-slate-200">Customize Charts</h3>
+        <button id="btnCloseCustomize" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs">Close</button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+        <div class="space-y-2">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Datasets</p>
+          <label class="flex items-center gap-2"><input type="checkbox" id="chkShowIncome" class="accent-green-500" checked /> <span>Show Income</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="chkShowExpenses" class="accent-rose-500" checked /> <span>Show Expenses</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="chkShowPayroll" class="accent-blue-500" checked /> <span>Show Payroll</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="chkShowNet" class="accent-amber-500" checked /> <span>Show Net</span></label>
+        </div>
+        <div class="space-y-2">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Timeline</p>
+          <label class="block">Unit
+            <select id="selTimeUnit" class="mt-1 w-full px-2 py-1 rounded bg-slate-900/60 border border-slate-700">
+              <option value="day">Day</option>
+              <option value="week">Week</option>
+              <option value="month" selected>Month</option>
+            </select>
+          </label>
+          <p class="text-xs uppercase tracking-wide text-slate-400 mt-2">Pie Type</p>
+          <select id="selPieType" class="w-full px-2 py-1 rounded bg-slate-900/60 border border-slate-700">
+            <option value="doughnut" selected>Doughnut</option>
+            <option value="pie">Pie</option>
+          </select>
+        </div>
+        <div class="space-y-2">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Colors</p>
+          <label class="flex items-center justify-between gap-2">
+            <span>Income</span>
+            <input type="color" id="colorIncome" value="#22c55e" class="h-8 w-12 rounded bg-transparent border border-slate-700" />
+          </label>
+          <label class="flex items-center justify-between gap-2">
+            <span>Expenses</span>
+            <input type="color" id="colorExpenses" value="#ef4444" class="h-8 w-12 rounded bg-transparent border border-slate-700" />
+          </label>
+          <label class="flex items-center justify-between gap-2">
+            <span>Payroll</span>
+            <input type="color" id="colorPayroll" value="#3b82f6" class="h-8 w-12 rounded bg-transparent border border-slate-700" />
+          </label>
+          <label class="flex items-center justify-between gap-2">
+            <span>Net</span>
+            <input type="color" id="colorNet" value="#eab308" class="h-8 w-12 rounded bg-transparent border border-slate-700" />
+          </label>
+        </div>
+      </div>
+      <div class="mt-4 flex gap-2">
+        <button id="btnApplyPrefs" class="px-4 py-2 rounded bg-purple-600 hover:bg-purple-500 text-sm">Apply</button>
+        <button id="btnResetPrefs" class="px-3 py-2 rounded bg-slate-700 hover:bg-slate-600 text-sm">Reset</button>
       </div>
     </section>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
       <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
         <h3 class="text-sm text-slate-400 mb-1">Total Income</h3>
         <div class="text-2xl font-bold text-green-400" id="totalIncome">£0.00</div>
@@ -96,6 +150,10 @@
       <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
         <h3 class="text-sm text-slate-400 mb-1">Total Expenses</h3>
         <div class="text-2xl font-bold text-rose-400" id="totalExpenses">£0.00</div>
+      </div>
+      <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
+        <h3 class="text-sm text-slate-400 mb-1">Total Payroll</h3>
+        <div class="text-2xl font-bold text-blue-400" id="totalPayroll">£0.00</div>
       </div>
       <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover">
         <h3 class="text-sm text-slate-400 mb-1">Net Income</h3>
@@ -108,7 +166,7 @@
       <div class="chart-container"><canvas id="timelineChart"></canvas></div>
       <div class="chart-container"><canvas id="incomePieChart"></canvas></div>
       <div class="chart-container"><canvas id="expensesPieChart"></canvas></div>
-      <div class="chart-container"><canvas id="paymentMethodsChart"></canvas></div>
+      <div class="chart-container"><canvas id="payrollPieChart"></canvas></div>
     </div>
 
     <!-- Income Table -->
@@ -150,24 +208,375 @@
         </table>
       </div>
     </div>
+    <!-- Payroll Table (NEW) -->
+    <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover mt-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold text-blue-400">Payroll Transactions</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead class="text-xs uppercase bg-slate-700/50">
+            <tr>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="payroll-date">Date</th>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="payroll-employee">Employee</th>
+              <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50 text-right" data-sort="payroll-amount">Amount</th>
+            </tr>
+          </thead>
+          <tbody id="payrollTable" class="divide-y divide-slate-700/30"></tbody>
+        </table>
+      </div>
+    </div>
   </main>
 
-  <script>
-    const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+    <script>
+    function uid() {
+      return Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
 
+    const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
     let incomeData = [];
     let expensesData = [];
+    let payrollData = [];
 
     let timelineChart = null;
     let incomePieChart = null;
     let expensesPieChart = null;
-    let paymentMethodsChart = null;
+    let payrollPieChart = null;
+
+    // Simple preferences for charts, stored in localStorage
+    const PREFS_KEY = 'summary.prefs.v1';
+    const DEFAULT_PREFS = {
+      show: { income: true, expenses: true, payroll: true, net: true },
+      timelineUnit: 'month', // day | week | month
+      pieType: 'doughnut', // doughnut | pie
+      colors: { // hex colors
+        income: '#22c55e', // green-500
+        expenses: '#ef4444', // rose-500
+        payroll: '#3b82f6', // blue-500
+        net: '#eab308' // amber-500
+      }
+    };
+    let chartPrefs = null;
+    function loadPrefs(){
+      try{
+        const raw = localStorage.getItem(PREFS_KEY);
+        const p = raw ? JSON.parse(raw) : {};
+        const merged = {
+          show: Object.assign({}, DEFAULT_PREFS.show, p.show||{}),
+          timelineUnit: p.timelineUnit || DEFAULT_PREFS.timelineUnit,
+          pieType: p.pieType || DEFAULT_PREFS.pieType,
+          colors: Object.assign({}, DEFAULT_PREFS.colors, p.colors||{})
+        };
+        chartPrefs = merged;
+      }catch{ chartPrefs = JSON.parse(JSON.stringify(DEFAULT_PREFS)); }
+      return chartPrefs;
+    }
+    function savePrefs(p){ try{ localStorage.setItem(PREFS_KEY, JSON.stringify(p||chartPrefs||DEFAULT_PREFS)); }catch{} }
+    function hexToRGBA(hex, alpha){
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex||'#ffffff');
+      if(!m) return `rgba(255,255,255,${alpha||1})`;
+      const r=parseInt(m[1],16), g=parseInt(m[2],16), b=parseInt(m[3],16);
+      return `rgba(${r},${g},${b},${alpha==null?1:alpha})`;
+    }
+    function applyPrefsToUI(){
+      const p = chartPrefs || loadPrefs();
+      const qs = id=>document.getElementById(id);
+      const set = (id, val)=>{ const el=qs(id); if(!el) return; if(el.type==='checkbox') el.checked=!!val; else el.value=String(val); };
+      set('chkShowIncome', p.show.income);
+      set('chkShowExpenses', p.show.expenses);
+      set('chkShowPayroll', p.show.payroll);
+      set('chkShowNet', p.show.net);
+      set('selTimeUnit', p.timelineUnit);
+      set('selPieType', p.pieType);
+      set('colorIncome', p.colors.income);
+      set('colorExpenses', p.colors.expenses);
+      set('colorPayroll', p.colors.payroll);
+      set('colorNet', p.colors.net);
+    }
+    function readPrefsFromUI(){
+      const qs = id=>document.getElementById(id);
+      chartPrefs = {
+        show: {
+          income: !!qs('chkShowIncome')?.checked,
+          expenses: !!qs('chkShowExpenses')?.checked,
+          payroll: !!qs('chkShowPayroll')?.checked,
+          net: !!qs('chkShowNet')?.checked,
+        },
+        timelineUnit: qs('selTimeUnit')?.value || 'month',
+        pieType: qs('selPieType')?.value || 'doughnut',
+        colors: {
+          income: qs('colorIncome')?.value || DEFAULT_PREFS.colors.income,
+          expenses: qs('colorExpenses')?.value || DEFAULT_PREFS.colors.expenses,
+          payroll: qs('colorPayroll')?.value || DEFAULT_PREFS.colors.payroll,
+          net: qs('colorNet')?.value || DEFAULT_PREFS.colors.net,
+        }
+      };
+      return chartPrefs;
+    }
+
+    const state = { apiConnected: false };
+
+    function updateApiStatus(connected) {
+      const el = document.getElementById('apiStatus');
+      if (!el) return;
+      if (connected) {
+        el.textContent = 'Connected';
+        el.classList.remove('text-rose-400', 'text-amber-300');
+        el.classList.add('text-green-400');
+      } else {
+        el.textContent = 'Offline';
+        el.classList.remove('text-green-400', 'text-amber-300');
+        el.classList.add('text-rose-400');
+      }
+    }
+
+    async function ensureAPI() {
+      if (!window.API) { updateApiStatus(false); return false; }
+      if (state.apiConnected) return true;
+      let ok = await API.init('');
+      if (!ok) ok = await API.init('http://localhost:3000');
+      state.apiConnected = ok;
+      updateApiStatus(ok);
+      return ok;
+    }
+
+    async function loadData() {
+      const ok = await ensureAPI();
+      let inc = [], exp = [], pay = [];
+      if (ok) {
+        try {
+          [inc, exp, pay] = await Promise.all([
+            API.income.list(),
+            API.expenses.list(),
+            API.payroll.list()
+          ]);
+        } catch (e) { inc = []; exp = []; pay = []; }
+      }
+      try {
+        if (!(inc && inc.length)) {
+          const alt1 = JSON.parse(localStorage.getItem('income.simple.v1') || '[]');
+          const alt2 = JSON.parse(localStorage.getItem('fallback.income.v1') || '[]');
+          const arr = (Array.isArray(alt1) && alt1.length) ? alt1 : (Array.isArray(alt2) ? alt2 : []);
+          if (arr.length) inc = arr;
+        }
+      } catch {}
+      try {
+        if (!(exp && exp.length)) {
+          const alt1 = JSON.parse(localStorage.getItem('expenses.v1') || '[]');
+          const alt2 = JSON.parse(localStorage.getItem('fallback.expenses.v1') || '[]');
+          const arr = (Array.isArray(alt1) && alt1.length) ? alt1 : (Array.isArray(alt2) ? alt2 : []);
+          if (arr.length) exp = arr;
+        }
+      } catch {}
+      try {
+        if (!(pay && pay.length)) {
+          const alt = JSON.parse(localStorage.getItem('fallback.payroll.v1') || '[]');
+          if (Array.isArray(alt) && alt.length) pay = alt;
+        }
+      } catch {}
+      try {
+        if (!(pay && pay.length)) {
+          const r = await fetch('http://localhost:3000/api/payroll', { mode: 'cors' });
+          if (r.ok) {
+            const arr = await r.json();
+            if (Array.isArray(arr) && arr.length) pay = arr;
+          }
+        }
+      } catch {}
+      try {
+        if (!(pay && pay.length)) {
+          const alt1 = JSON.parse(localStorage.getItem('payroll.v1') || '[]');
+          const alt2 = JSON.parse(localStorage.getItem('payroll.simple.v1') || '[]');
+          const arr = (Array.isArray(alt1) && alt1.length) ? alt1 : (Array.isArray(alt2) ? alt2 : []);
+          if (arr.length) pay = arr;
+        }
+      } catch {}
+      incomeData = (inc || []).map(mapIncome);
+      expensesData = (exp || []).map(mapExpense);
+      payrollData = (pay || []).map(mapPayroll);
+    }
+
+    function mapIncome(row) {
+      const gross = Number(row.amount || row.total || row.net || 0);
+      const fees = Number(row.fees || 0);
+      return {
+        id: row.id,
+        date: row.date || '',
+        source: row.source || '',
+        processor: row.processor || '',
+        gross,
+        fees,
+        net: gross - fees,
+        notes: row.notes || ''
+      };
+    }
+
+    function mapExpense(row) {
+      const price = Number(row.total || 0);
+      const platform = row.source || row.seller || '';
+      return {
+        id: row.id,
+        date: row.date || '',
+        category: row.category || '',
+        seller: row.seller || '',
+        items: row.items || '',
+        orderNumber: row.orderNumber || row.order_number || '',
+        price,
+        platform,
+        source: row.source || '',
+        notes: row.notes || ''
+      };
+    }
+
+    function mapPayroll(row) {
+      return {
+        id: row.id,
+        date: row.date || '',
+        employee: row.employee || row.name || row.worker || '',
+        amount: Number(row.amount || row.total || row.net || 0),
+        notes: row.notes || ''
+      };
+    }
+
+    function toISODate(input) {
+      if (!input) return '';
+      const value = String(input).trim();
+      if (!value) return '';
+      const formats = ['yyyy-MM-dd', 'dd/MM/yyyy', 'MM/dd/yyyy', 'dd-MM-yyyy', 'yyyy/MM/dd'];
+      let dt = luxon.DateTime.fromISO(value);
+      if (!dt.isValid) dt = luxon.DateTime.fromSQL(value);
+      for (const fmt of formats) {
+        if (dt.isValid) break;
+        dt = luxon.DateTime.fromFormat(value, fmt);
+      }
+      return dt.isValid ? dt.toISODate() : '';
+    }
+
+    function parseCSV(text) {
+      const rows = [];
+      let row = [];
+      let field = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') { field += '"'; i++; }
+            else { inQuotes = false; }
+          } else field += ch;
+        } else {
+          if (ch === '"') inQuotes = true;
+          else if (ch === ',') { row.push(field); field = ''; }
+          else if (ch === '\n' || ch === '\r') {
+            if (field !== '' || row.length) {
+              row.push(field);
+              rows.push(row);
+              row = [];
+              field = '';
+            }
+          } else field += ch;
+        }
+      }
+      if (field !== '' || row.length) {
+        row.push(field);
+        rows.push(row);
+      }
+      return rows.filter(r => r.some(cell => cell.trim() !== ''));
+    }
+
+    function processIncomeCSV(csvText) {
+      const rows = parseCSV(csvText);
+      if (rows.length < 2) return [];
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const dateIdx = header.indexOf('date');
+      const sourceIdx = header.indexOf('source');
+      const processorIdx = header.indexOf('processor');
+      let amountIdx = header.findIndex(h => h.includes('amount'));
+      let feesIdx = header.findIndex(h => h.includes('fee'));
+      const notesIdx = header.indexOf('notes');
+      return rows.slice(1).map(r => {
+        const date = toISODate(r[dateIdx]);
+        const amountRaw = amountIdx !== -1 ? r[amountIdx] : '0';
+        const feesRaw = feesIdx !== -1 ? r[feesIdx] : '0';
+        const amount = Number(String(amountRaw || '0').replace(/[^0-9.-]/g, '')) || 0;
+        const fees = Number(String(feesRaw || '0').replace(/[^0-9.-]/g, '')) || 0;
+        return {
+          date,
+          source: sourceIdx !== -1 ? (r[sourceIdx] || '').trim() : '',
+          processor: processorIdx !== -1 ? (r[processorIdx] || '').trim() : '',
+          amount,
+          fees,
+          notes: notesIdx !== -1 ? (r[notesIdx] || '').trim() : ''
+        };
+      }).filter(rec => rec.date && rec.amount);
+    }
+
+    function processExpensesCSV(csvText) {
+      const rows = parseCSV(csvText);
+      if (rows.length < 2) return [];
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const dateIdx = header.indexOf('date');
+      const categoryIdx = header.indexOf('category');
+      const sourceIdx = header.indexOf('source');
+      const sellerIdx = header.indexOf('seller');
+      let itemIdx = header.indexOf('item(s)');
+      if (itemIdx === -1) itemIdx = header.findIndex(h => h.includes('item'));
+      let amountIdx = header.findIndex(h => h.includes('total') || h.includes('amount'));
+      const orderIdx = header.findIndex(h => h.startsWith('order'));
+      const notesIdx = header.indexOf('notes');
+      return rows.slice(1).map(r => {
+        const date = toISODate(r[dateIdx]);
+        const total = amountIdx !== -1 ? Number(String(r[amountIdx] || '0').replace(/[^0-9.-]/g, '')) || 0 : 0;
+        const seller = sellerIdx !== -1 ? (r[sellerIdx] || '').trim() : '';
+        const source = sourceIdx !== -1 ? (r[sourceIdx] || '').trim() : '';
+        const category = categoryIdx !== -1 ? (r[categoryIdx] || '').trim() : '';
+        const items = itemIdx !== -1 ? (r[itemIdx] || '').trim() : '';
+        const orderNumber = orderIdx !== -1 ? (r[orderIdx] || '').trim() : '';
+        const notes = notesIdx !== -1 ? (r[notesIdx] || '').trim() : '';
+        return {
+          date,
+          category,
+          seller,
+          items,
+          orderNumber,
+          total,
+          notes,
+          source: source || seller
+        };
+      }).filter(rec => rec.date && rec.total);
+    }
+
+    function processPayrollCSV(csvText) {
+      const rows = parseCSV(csvText);
+      if (rows.length < 2) return [];
+      const header = rows[0].map(h => h.trim().toLowerCase());
+      const dateIdx = header.indexOf('date');
+      const employeeIdx = header.indexOf('employee');
+      let amountIdx = header.findIndex(h => h.includes('amount') || h.includes('net'));
+      const notesIdx = header.indexOf('notes');
+      return rows.slice(1).map(r => {
+        const date = toISODate(r[dateIdx]);
+        const amount = amountIdx !== -1 ? Number(String(r[amountIdx] || '0').replace(/[^0-9.-]/g, '')) || 0 : 0;
+        return {
+          date,
+          employee: employeeIdx !== -1 ? (r[employeeIdx] || '').trim() : '',
+          amount,
+          notes: notesIdx !== -1 ? (r[notesIdx] || '').trim() : ''
+        };
+      }).filter(rec => rec.date && rec.employee && rec.amount);
+    }
+
+    function filterDataByDateRange(data, startDate, endDate) {
+      const s = (startDate instanceof Date && !isNaN(startDate)) ? startDate : new Date('1970-01-01');
+      const e = (endDate instanceof Date && !isNaN(endDate)) ? endDate : new Date('9999-12-31');
+      return data.filter(it => {
+        const d = new Date(it.date);
+        return !isNaN(d) && d >= s && d <= e;
+      });
+    }
 
     const colors = {
-      income: 'rgba(34, 197, 94, 0.2)',
-      incomeBorder: 'rgb(34, 197, 94)',
-      expenses: 'rgba(239, 68, 68, 0.2)',
-      expensesBorder: 'rgb(239, 68, 68)',
+      // keep pie palette static; dataset colors derive from prefs
       pieColors: [
         'rgba(59, 130, 246, 0.6)',
         'rgba(99, 102, 241, 0.6)',
@@ -180,103 +589,36 @@
       ]
     };
 
-    function parseCSV(text) {
-      const lines = text.split(/\r?\n/);
-      const rows = [];
-      for (let line of lines) {
-        if (!line.trim()) continue;
-        const row = []; let field = ''; let inQuotes = false;
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i];
-          if (inQuotes) {
-            if (ch === '"') {
-              if (line[i+1] === '"') { field += '"'; i++; } else { inQuotes = false; }
-            } else { field += ch; }
-          } else {
-            if (ch === '"') inQuotes = true; else if (ch === ',') { row.push(field.trim()); field = ''; } else { field += ch; }
-          }
-        }
-        row.push(field.trim());
-        while (row.length && row[row.length-1] === '') row.pop();
-        if (row.filter(f => f !== '').length > 1) rows.push(row);
-      }
-      return rows;
-    }
-
-    function processIncomeCSV(csvText) {
-      const rows = parseCSV(csvText);
-      if (rows.length < 2) return [];
-      const header = rows[0].map(h => h.trim().toLowerCase());
-      const dateIdx = header.indexOf('date');
-      const sourceIdx = header.indexOf('source');
-      const processorIdx = header.indexOf('processor');
-      let amountIdx = header.findIndex(h => h.includes('amountgbp'));
-      let feesIdx = header.findIndex(h => h.includes('feesgbp'));
-      if (amountIdx === -1) amountIdx = header.findIndex(h => h.includes('amount'));
-      if (feesIdx === -1) feesIdx = header.findIndex(h => h.includes('fees'));
-      return rows.slice(1).map(r => {
-        const d = (r[dateIdx]||'').trim();
-        let parsed = luxon.DateTime.fromFormat(d, 'dd/MM/yyyy');
-        if (!parsed.isValid) parsed = luxon.DateTime.fromFormat(d, 'dd-MM-yyyy');
-        const dateISO = parsed.isValid ? parsed.toISODate() : '';
-        const amount = Number(String(r[amountIdx]||'0').replace(/[^0-9.-]/g, '')) || 0;
-        const fees = Number(String(r[feesIdx]||'0').replace(/[^0-9.-]/g, '')) || 0;
-        return { date: dateISO, source: r[sourceIdx]||'', processor: r[processorIdx]||'', amount: amount - fees };
-      });
-    }
-
-    // UPDATED: parse Platform and Item name for expenses
-    function processExpensesCSV(csvText) {
-      const rows = parseCSV(csvText);
-      if (rows.length < 2) return [];
-      const header = rows[0].map(h => h.trim().toLowerCase());
-      const dateIdx = header.indexOf('date');
-      const sourceIdx = header.indexOf('source'); // e.g., AliExpress, Amazon
-      const sellerIdx = header.indexOf('seller'); // fallback when source missing
-      let itemIdx = header.indexOf('item(s)');
-      if (itemIdx === -1) itemIdx = header.findIndex(h => h === 'item' || h.includes('item'));
-      let amountIdx = header.findIndex(h => h === 'totalgbp' || h.includes('amountgbp') || h === 'amount');
-      if (amountIdx === -1) amountIdx = header.findIndex(h => h.includes('total') || h.includes('amount'));
-      const categoryIdx = header.indexOf('category'); // optional fallback for item name
-
-      return rows.slice(1).map(r => {
-        const d = (r[dateIdx]||'').trim();
-        let parsed = luxon.DateTime.fromFormat(d, 'dd/MM/yyyy');
-        if (!parsed.isValid) parsed = luxon.DateTime.fromFormat(d, 'dd-MM-yyyy');
-        const dateISO = parsed.isValid ? parsed.toISODate() : '';
-        const price = Number(String(r[amountIdx]||'0').replace(/[^0-9.-]/g, '')) || 0;
-        const platform = (r[sourceIdx] && r[sourceIdx].trim()) ? r[sourceIdx].trim() : (r[sellerIdx]||'').trim();
-        const item = (r[itemIdx] && r[itemIdx].trim()) ? r[itemIdx].trim() : ((categoryIdx !== -1 && r[categoryIdx]) ? r[categoryIdx].trim() : '');
-        return { date: dateISO, platform, price, item };
-      });
-    }
-
-    function filterDataByDateRange(data, startDate, endDate) {
-      return data.filter(it => {
-        const d = new Date(it.date);
-        return (!isNaN(d)) && d >= startDate && d <= endDate;
-      });
-    }
-
     function initCharts() {
+      if (!chartPrefs) loadPrefs();
+      const p = chartPrefs;
+      const incomeBorder = p.colors.income;
+      const incomeBg = hexToRGBA(p.colors.income, 0.2);
+      const expensesBorder = p.colors.expenses;
+      const expensesBg = hexToRGBA(p.colors.expenses, 0.2);
+      const payrollBorder = p.colors.payroll;
+      const payrollBg = hexToRGBA(p.colors.payroll, 0.2);
+      const netBorder = p.colors.net;
       const timelineCtx = document.getElementById('timelineChart').getContext('2d');
       timelineChart = new Chart(timelineCtx, {
         type: 'line',
         data: { datasets: [
-          { label: 'Income', borderColor: colors.incomeBorder, backgroundColor: colors.income, fill: true },
-          { label: 'Expenses', borderColor: colors.expensesBorder, backgroundColor: colors.expenses, fill: true }
+          { label: 'Income', borderColor: incomeBorder, backgroundColor: incomeBg, fill: true, tension: 0.35, hidden: !p.show.income },
+          { label: 'Expenses', borderColor: expensesBorder, backgroundColor: expensesBg, fill: true, tension: 0.35, hidden: !p.show.expenses },
+          { label: 'Payroll', borderColor: payrollBorder, backgroundColor: payrollBg, fill: true, tension: 0.35, hidden: !p.show.payroll },
+          { label: 'Net', borderColor: netBorder, borderDash: [5,4], pointRadius: 0, fill: false, tension: 0.35, hidden: !p.show.net }
         ]},
-        options: { responsive: true, scales: { x: { type: 'time', time: { unit: 'month' } }, y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'Income vs Expenses Over Time', color: '#e2e8f0', font: { size: 16 } } } }
+        options: { responsive: true, scales: { x: { type: 'time', time: { unit: p.timelineUnit } }, y: { beginAtZero: true } }, plugins: { title: { display: true, text: 'Cashflow Over Time', color: '#e2e8f0', font: { size: 16 } } } }
       });
 
       const incomeSourcesCtx = document.getElementById('incomePieChart').getContext('2d');
-      incomePieChart = new Chart(incomeSourcesCtx, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Income Sources', color: '#e2e8f0', font: { size: 16 }}}}});
+      incomePieChart = new Chart(incomeSourcesCtx, { type: p.pieType, data: { labels: [], datasets: [{ data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Income Sources', color: '#e2e8f0', font: { size: 16 }}}}});
 
       const expenseCategoriesCtx = document.getElementById('expensesPieChart').getContext('2d');
-      expensesPieChart = new Chart(expenseCategoriesCtx, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Expense Categories', color: '#e2e8f0', font: { size: 16 }}}}});
+      expensesPieChart = new Chart(expenseCategoriesCtx, { type: p.pieType, data: { labels: [], datasets: [{ data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Expense Platforms', color: '#e2e8f0', font: { size: 16 }}}}});
 
-      const paymentMethodsCtx = document.getElementById('paymentMethodsChart').getContext('2d');
-      paymentMethodsChart = new Chart(paymentMethodsCtx, { type: 'bar', data: { labels: [], datasets: [{ label: 'Transactions', data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Platforms / Methods', color: '#e2e8f0', font: { size: 16 }}}, scales: { y: { beginAtZero: true } } }});
+      const payrollCtx = document.getElementById('payrollPieChart').getContext('2d');
+      payrollPieChart = new Chart(payrollCtx, { type: p.pieType, data: { labels: [], datasets: [{ data: [], backgroundColor: colors.pieColors }]}, options: { responsive: true, plugins: { title: { display: true, text: 'Payroll by Employee', color: '#e2e8f0', font: { size: 16 }}}}});
     }
 
     function updateCharts() {
@@ -284,55 +626,221 @@
       const endDate = new Date(document.getElementById('endDate').value);
       const inc = filterDataByDateRange(incomeData, startDate, endDate);
       const exp = filterDataByDateRange(expensesData, startDate, endDate);
+      const pay = filterDataByDateRange(payrollData, startDate, endDate);
 
-      const totalInc = inc.reduce((s,i)=>s+i.amount,0);
-      const totalExp = exp.reduce((s,i)=>s+i.price,0);
-      const net = totalInc - totalExp;
+
+      const totalInc = inc.reduce((sum, item) => sum + (Number(item.net ?? item.gross ?? 0)), 0);
+      const totalExp = exp.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+      const totalPayroll = pay.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+      const net = totalInc - totalExp - totalPayroll;
+
       document.getElementById('totalIncome').textContent = gbp.format(totalInc);
       document.getElementById('totalExpenses').textContent = gbp.format(totalExp);
+      document.getElementById('totalPayroll').textContent = gbp.format(totalPayroll);
       const netEl = document.getElementById('netIncome');
       netEl.textContent = gbp.format(net);
       netEl.className = 'text-2xl font-bold ' + (net >= 0 ? 'text-green-400' : 'text-rose-400');
 
       const timelineData = {};
-      inc.forEach(i=>{ const d=i.date; (timelineData[d] ||= {income:0, expenses:0}).income += i.amount; });
-      exp.forEach(e=>{ const d=e.date; (timelineData[d] ||= {income:0, expenses:0}).expenses += e.price; });
+      inc.forEach(item => {
+        const key = item.date;
+        const entry = timelineData[key] ||= { income: 0, expenses: 0, payroll: 0 };
+        entry.income += Number(item.net ?? item.gross ?? 0);
+      });
+      exp.forEach(item => {
+        const key = item.date;
+        const entry = timelineData[key] ||= { income: 0, expenses: 0, payroll: 0 };
+        entry.expenses += Number(item.price || 0);
+      });
+      pay.forEach(item => {
+        const key = item.date;
+        const entry = timelineData[key] ||= { income: 0, expenses: 0, payroll: 0 };
+        entry.payroll += Number(item.amount || 0);
+      });
       const dates = Object.keys(timelineData).sort();
       timelineChart.data.labels = dates;
-      timelineChart.data.datasets[0].data = dates.map(d=>timelineData[d].income);
-      timelineChart.data.datasets[1].data = dates.map(d=>timelineData[d].expenses);
+      timelineChart.data.datasets[0].data = dates.map(d => timelineData[d].income);
+      timelineChart.data.datasets[1].data = dates.map(d => timelineData[d].expenses);
+      timelineChart.data.datasets[2].data = dates.map(d => timelineData[d].payroll);
+      timelineChart.data.datasets[3].data = dates.map(d => (timelineData[d].income - timelineData[d].expenses - timelineData[d].payroll));
+      // Apply visibility prefs
+      if (!chartPrefs) loadPrefs();
+      timelineChart.data.datasets[0].hidden = !chartPrefs.show.income;
+      timelineChart.data.datasets[1].hidden = !chartPrefs.show.expenses;
+      timelineChart.data.datasets[2].hidden = !chartPrefs.show.payroll;
+      timelineChart.data.datasets[3].hidden = !chartPrefs.show.net;
+      // Update x-axis unit if changed
+      if (timelineChart.options?.scales?.x?.time) {
+        timelineChart.options.scales.x.time.unit = chartPrefs.timelineUnit || 'month';
+      }
       timelineChart.update();
 
       const incomeSources = {};
-      inc.forEach(i=>{ incomeSources[i.source] = (incomeSources[i.source]||0) + i.amount; });
+      inc.forEach(i => {
+        const key = i.source || 'Unknown';
+        incomeSources[key] = (incomeSources[key] || 0) + Number(i.net ?? i.gross ?? 0);
+      });
       incomePieChart.data.labels = Object.keys(incomeSources);
       incomePieChart.data.datasets[0].data = Object.values(incomeSources);
       incomePieChart.update();
 
       const expensePlatforms = {};
-      exp.forEach(e=>{ const key = e.platform || 'Unknown'; expensePlatforms[key] = (expensePlatforms[key]||0) + e.price; });
+      exp.forEach(e => {
+        const key = e.platform || 'Unknown';
+        expensePlatforms[key] = (expensePlatforms[key] || 0) + Number(e.price || 0);
+      });
       expensesPieChart.data.labels = Object.keys(expensePlatforms);
       expensesPieChart.data.datasets[0].data = Object.values(expensePlatforms);
       expensesPieChart.update();
 
-      const methods = {};
-      inc.forEach(i=>{ if (i.processor) methods[i.processor] = (methods[i.processor]||0)+1; });
-      exp.forEach(e=>{ if (e.platform) methods[e.platform] = (methods[e.platform]||0)+1; });
-      paymentMethodsChart.data.labels = Object.keys(methods);
-      paymentMethodsChart.data.datasets[0].data = Object.values(methods);
-      paymentMethodsChart.update();
+      const payrollByEmployee = {};
+      pay.forEach(p => {
+        const key = p.employee || 'Unknown';
+        payrollByEmployee[key] = (payrollByEmployee[key] || 0) + Number(p.amount || 0);
+      });
+      payrollPieChart.data.labels = Object.keys(payrollByEmployee);
+      payrollPieChart.data.datasets[0].data = Object.values(payrollByEmployee);
+      payrollPieChart.update();
+    }
+
+    // Recreate charts (for when pie type or colors change)
+    function reinitChartsFromPrefs(){
+      try { timelineChart?.destroy(); } catch {}
+      try { incomePieChart?.destroy(); } catch {}
+      try { expensesPieChart?.destroy(); } catch {}
+      try { payrollPieChart?.destroy(); } catch {}
+      initCharts();
+      updateCharts();
+    }
+
+    let incomeSortField = 'income-date';
+    let incomeSortDirection = 'desc';
+    let expenseSortField = 'expense-date';
+    let expenseSortDirection = 'desc';
+    let payrollSortField = 'payroll-date';
+    let payrollSortDirection = 'desc';
+
+    function updateTables() {
+      const startDate = new Date(document.getElementById('startDate').value);
+      const endDate = new Date(document.getElementById('endDate').value);
+      const inc = filterDataByDateRange(incomeData, startDate, endDate);
+      const exp = filterDataByDateRange(expensesData, startDate, endDate);
+      const pay = filterDataByDateRange(payrollData, startDate, endDate);
+
+
+      inc.sort((a, b) => {
+        const field = incomeSortField.replace('income-', '');
+        let comp = 0;
+        switch (field) {
+          case 'date': comp = new Date(a.date) - new Date(b.date); break;
+          case 'amount': comp = (a.net ?? a.gross ?? 0) - (b.net ?? b.gross ?? 0); break;
+          case 'source': comp = (a.source || '').localeCompare(b.source || ''); break;
+          case 'processor': comp = (a.processor || '').localeCompare(b.processor || ''); break;
+        }
+        return incomeSortDirection === 'asc' ? comp : -comp;
+      });
+
+      exp.sort((a, b) => {
+        const field = expenseSortField.replace('expense-', '');
+        let comp = 0;
+        switch (field) {
+          case 'date': comp = new Date(a.date) - new Date(b.date); break;
+          case 'price': comp = (a.price || 0) - (b.price || 0); break;
+          case 'platform': comp = (a.platform || '').localeCompare(b.platform || ''); break;
+          case 'item': comp = (a.items || '').localeCompare(b.items || ''); break;
+        }
+        return expenseSortDirection === 'asc' ? comp : -comp;
+      });
+
+      const incomeTable = document.getElementById('incomeTable');
+      incomeTable.innerHTML = inc.map(i => `
+        <tr class="hover:bg-slate-700/30 transition-colors">
+          <td class="px-4 py-2">${i.date || ''}</td>
+          <td class="px-4 py-2">${i.source || 'N/A'}</td>
+          <td class="px-4 py-2">${i.processor || 'N/A'}</td>
+          <td class="px-4 py-2 text-right text-green-400">${gbp.format(Number(i.net ?? i.gross ?? 0))}</td>
+        </tr>
+      `).join('');
+
+      const expensesTable = document.getElementById('expensesTable');
+      expensesTable.innerHTML = exp.map(e => `
+        <tr class="hover:bg-slate-700/30 transition-colors">
+          <td class="px-4 py-2">${e.date || ''}</td>
+          <td class="px-4 py-2">${e.platform || 'N/A'}</td>
+          <td class="px-4 py-2 text-right text-rose-400">${gbp.format(Number(e.price || 0))}</td>
+          <td class="px-4 py-2">${e.items || 'N/A'}</td>
+        </tr>
+      `).join('');
+
+      // Payroll table render
+      pay.sort((a, b) => {
+        const field = payrollSortField.replace('payroll-', '');
+        let comp = 0;
+        switch (field) {
+          case 'date': comp = new Date(a.date) - new Date(b.date); break;
+          case 'employee': comp = (a.employee || '').localeCompare(b.employee || ''); break;
+          case 'amount': comp = (a.amount || 0) - (b.amount || 0); break;
+        }
+        return payrollSortDirection === 'asc' ? comp : -comp;
+      });
+      const payrollTable = document.getElementById('payrollTable');
+      if (payrollTable) {
+        payrollTable.innerHTML = pay.map(p => `
+          <tr class="hover:bg-slate-700/30 transition-colors">
+            <td class="px-4 py-2">${p.date || ''}</td>
+            <td class="px-4 py-2">${p.employee || 'N/A'}</td>
+            <td class="px-4 py-2 text-right text-blue-400">${gbp.format(Number(p.amount || 0))}</td>
+          </tr>
+        `).join('');
+      }
+
+      updateSortIndicators();
+    }
+
+    function updateSortIndicators() {
+      document.querySelectorAll('th[data-sort]').forEach(th => {
+        const field = th.dataset.sort;
+        const isIncome = field.startsWith('income-');
+        const active = isIncome ? field === incomeSortField : field === expenseSortField;
+        const direction = isIncome ? incomeSortDirection : expenseSortDirection;
+        const baseLabel = th.dataset.label || th.textContent.replace(/[\s??]+$/, '').trim();
+        th.dataset.label = baseLabel;
+        th.textContent = baseLabel + (active ? (direction === 'asc' ? ' ▲' : ' ▼') : '');
+        th.classList.toggle('text-purple-300', active);
+      });
+    }
+
+    // Override with payroll-aware indicators
+    function updateSortIndicators() {
+      document.querySelectorAll('th[data-sort]').forEach(th => {
+        const field = th.dataset.sort;
+        let active = false;
+        let direction = 'asc';
+        if (field.startsWith('income-')) { active = field === incomeSortField; direction = incomeSortDirection; }
+        else if (field.startsWith('expense-')) { active = field === expenseSortField; direction = expenseSortDirection; }
+        else if (field.startsWith('payroll-')) { active = field === payrollSortField; direction = payrollSortDirection; }
+        const baseLabel = th.dataset.label || th.textContent.replace(/[\s??]+$/, '').trim();
+        th.dataset.label = baseLabel;
+        th.textContent = baseLabel + (active ? (direction === 'asc' ? ' ▲' : ' ▼') : '');
+        th.classList.toggle('text-purple-300', active);
+      });
     }
 
     function setQuickSelectDates(value) {
-      const end = new Date(); let start = new Date();
-      switch(value){
-        case '7d': start.setDate(end.getDate()-7); break;
-        case '1m': start.setMonth(end.getMonth()-1); break;
-        case '3m': start.setMonth(end.getMonth()-3); break;
-        case '6m': start.setMonth(end.getMonth()-6); break;
-        case '1y': start.setFullYear(end.getFullYear()-1); break;
+      const end = new Date();
+      let start = new Date();
+      switch (value) {
+        case '7d': start.setDate(end.getDate() - 7); break;
+        case '1m': start.setMonth(end.getMonth() - 1); break;
+        case '3m': start.setMonth(end.getMonth() - 3); break;
+        case '6m': start.setMonth(end.getMonth() - 6); break;
+        case '1y': start.setFullYear(end.getFullYear() - 1); break;
         case 'all':
-          const allDates = [ ...incomeData.map(i=>new Date(i.date)), ...expensesData.map(e=>new Date(e.date))].filter(d=>!isNaN(d));
+          const allDates = [
+            ...incomeData.map(i => new Date(i.date)),
+            ...expensesData.map(e => new Date(e.date)),
+            ...payrollData.map(p => new Date(p.date))
+          ].filter(d => !isNaN(d));
           start = allDates.length ? new Date(Math.min(...allDates)) : new Date();
           break;
       }
@@ -340,88 +848,92 @@
       document.getElementById('endDate').valueAsDate = end;
     }
 
-    function showAlert(msg){ alert(msg); }
-
-    document.getElementById('incomeImport').addEventListener('change', e => {
-      const file = e.target.files[0]; if (!file) return;
-      if (!file.name.toLowerCase().endsWith('.csv')) { showAlert('Please select a CSV file'); e.target.value=''; return; }
-      const reader = new FileReader();
-      reader.onload = () => { incomeData = processIncomeCSV(reader.result); showAlert(`Imported ${incomeData.length} income records`); updateCharts(); updateTables(); };
-      reader.readAsText(file); e.target.value='';
-    });
-
-    document.getElementById('expensesImport').addEventListener('change', e => {
-      const file = e.target.files[0]; if (!file) return;
-      if (!file.name.toLowerCase().endsWith('.csv')) { showAlert('Please select a CSV file'); e.target.value=''; return; }
-      const reader = new FileReader();
-      reader.onload = () => { expensesData = processExpensesCSV(reader.result); showAlert(`Imported ${expensesData.length} expense records`); updateCharts(); updateTables(); };
-      reader.readAsText(file); e.target.value='';
-    });
-
-    document.getElementById('quickSelect').addEventListener('change', e => { setQuickSelectDates(e.target.value); updateCharts(); updateTables(); });
-    document.getElementById('updateCharts').addEventListener('click', () => { updateCharts(); updateTables(); });
-
-    // TABLES & SORTING
-    let incomeSortField = 'income-date';
-    let incomeSortDirection = 'desc';
-    let expenseSortField = 'expense-date';
-    let expenseSortDirection = 'desc';
-
-    function updateTables(){
-      const startDate = new Date(document.getElementById('startDate').value);
-      const endDate = new Date(document.getElementById('endDate').value);
-      const inc = filterDataByDateRange(incomeData, startDate, endDate);
-      const exp = filterDataByDateRange(expensesData, startDate, endDate);
-
-      inc.sort((a,b)=>{ let c=0; const f = incomeSortField.replace('income-','');
-        switch(f){ case 'date': c=new Date(a.date)-new Date(b.date); break; case 'amount': c=a.amount-b.amount; break; case 'source': c=a.source.localeCompare(b.source); break; case 'processor': c=(a.processor||'').localeCompare(b.processor||''); break; }
-        return incomeSortDirection==='asc'?c:-c; });
-
-      exp.sort((a,b)=>{ let c=0; const f = expenseSortField.replace('expense-','');
-        switch(f){ case 'date': c=new Date(a.date)-new Date(b.date); break; case 'price': c=a.price-b.price; break; case 'platform': c=(a.platform||'').localeCompare(b.platform||''); break; case 'item': c=(a.item||'').localeCompare(b.item||''); break; }
-        return expenseSortDirection==='asc'?c:-c; });
-
-      const incomeTable = document.getElementById('incomeTable');
-      incomeTable.innerHTML = inc.map(i=>`
-        <tr class="hover:bg-slate-700/30 transition-colors">
-          <td class="px-4 py-2">${i.date}</td>
-          <td class="px-4 py-2">${i.source}</td>
-          <td class="px-4 py-2">${i.processor || 'N/A'}</td>
-          <td class="px-4 py-2 text-right text-green-400">${gbp.format(i.amount)}</td>
-        </tr>
-      `).join('');
-
-      const expensesTable = document.getElementById('expensesTable');
-      expensesTable.innerHTML = exp.map(e=>`
-        <tr class="hover:bg-slate-700/30 transition-colors">
-          <td class="px-4 py-2">${e.date}</td>
-          <td class="px-4 py-2">${e.platform || 'N/A'}</td>
-          <td class="px-4 py-2 text-right text-rose-400">${gbp.format(e.price)}</td>
-          <td class="px-4 py-2">${e.item || 'N/A'}</td>
-        </tr>
-      `).join('');
+    function showAlert(msg) {
+      alert(msg);
     }
 
-    document.querySelectorAll('th[data-sort]').forEach(th=>{
-      th.addEventListener('click',()=>{
-        const field = th.dataset.sort;
-        if (field.startsWith('income-')) {
-          if (field === incomeSortField) { incomeSortDirection = incomeSortDirection==='asc'?'desc':'asc'; }
-          else { incomeSortField = field; incomeSortDirection = 'desc'; }
-        } else {
-          if (field === expenseSortField) { expenseSortDirection = expenseSortDirection==='asc'?'desc':'asc'; }
-          else { expenseSortField = field; expenseSortDirection = 'desc'; }
-        }
-        document.querySelectorAll('th[data-sort]').forEach(h=>{ h.textContent = h.textContent.replace(' ↑','').replace(' ↓',''); });
-        const dir = (field.startsWith('income-') ? incomeSortDirection : expenseSortDirection) === 'asc' ? ' ↑' : ' ↓';
-        th.textContent += dir;
-        updateTables();
-      });
-    });
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
 
-    // INIT
-    function bootstrap(){ initCharts(); setQuickSelectDates('1m'); updateCharts(); updateTables(); }
-    bootstrap();
-  </script>
+    async function refreshSummary() {
+      await loadData();
+      if (!timelineChart) initCharts();
+      updateCharts();
+      updateTables();
+    }
+
+    function reloadIframe(selector) {
+      const frame = document.querySelector(selector);
+      if (!frame) return;
+      try {
+        if (frame.contentWindow) frame.contentWindow.location.reload();
+        else frame.src = frame.src;
+      } catch {
+        frame.src = frame.src;
+      }
+    }
+
+    function reloadLinkedFrames() {}
+
+    // Wire up controls for filtering and sorting
+    (function attachEvents(){
+      const start = document.getElementById('startDate');
+      const end = document.getElementById('endDate');
+      const quick = document.getElementById('quickSelect');
+      const btn = document.getElementById('updateCharts');
+      if (btn) btn.addEventListener('click', ()=>{ updateCharts(); updateTables(); });
+      const customize = document.getElementById('btnCustomize');
+      const customPanel = document.getElementById('customizeSection');
+      const closeCustom = document.getElementById('btnCloseCustomize');
+      const applyPrefsBtn = document.getElementById('btnApplyPrefs');
+      const resetPrefsBtn = document.getElementById('btnResetPrefs');
+      if (customize && customPanel) customize.addEventListener('click', ()=>{ customPanel.classList.toggle('hidden'); applyPrefsToUI(); });
+      if (closeCustom && customPanel) closeCustom.addEventListener('click', ()=> customPanel.classList.add('hidden'));
+      if (applyPrefsBtn) applyPrefsBtn.addEventListener('click', ()=>{ readPrefsFromUI(); savePrefs(chartPrefs); reinitChartsFromPrefs(); });
+      if (resetPrefsBtn) resetPrefsBtn.addEventListener('click', ()=>{ chartPrefs = JSON.parse(JSON.stringify(DEFAULT_PREFS)); savePrefs(chartPrefs); applyPrefsToUI(); reinitChartsFromPrefs(); });
+      if (quick) quick.addEventListener('change', ()=>{ setQuickSelectDates(quick.value); updateCharts(); updateTables(); });
+      if (start) start.addEventListener('change', ()=>{ updateCharts(); updateTables(); });
+      if (end) end.addEventListener('change', ()=>{ updateCharts(); updateTables(); });
+      document.querySelectorAll('th[data-sort]').forEach(th => {
+        th.addEventListener('click', ()=>{
+          const field = th.dataset.sort || '';
+          if (field.startsWith('income-')) {
+            if (incomeSortField === field) incomeSortDirection = (incomeSortDirection === 'asc' ? 'desc' : 'asc');
+            else { incomeSortField = field; incomeSortDirection = 'desc'; }
+          } else if (field.startsWith('expense-')) {
+            if (expenseSortField === field) expenseSortDirection = (expenseSortDirection === 'asc' ? 'desc' : 'asc');
+            else { expenseSortField = field; expenseSortDirection = 'desc'; }
+          } else if (field.startsWith('payroll-')) {
+            if (payrollSortField === field) payrollSortDirection = (payrollSortDirection === 'asc' ? 'desc' : 'asc');
+            else { payrollSortField = field; payrollSortDirection = 'desc'; }
+          }
+          updateSortIndicators();
+          updateTables();
+        });
+      });
+    })();
+
+    // Tab logic removed in favor of page navigation
+      (async function bootstrap() {
+      await ensureAPI();
+      await loadData();
+      if (!timelineChart) initCharts();
+      const quick = document.getElementById('quickSelect');
+      if (quick) quick.value = '7d';
+      setQuickSelectDates('7d');
+      updateCharts();
+      updateTables();
+      updateApiStatus(state.apiConnected);
+    })();</script>
 </body>
 </html>
+
+

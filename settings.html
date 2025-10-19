@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Settings</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon"></script>
+  <script src="shared_api.js"></script>
+  <meta name="color-scheme" content="dark light" />
+  <style>
+    :root { color-scheme: dark; }
+    html { overflow-y: scroll; }
+    .card-hover { transition: all 0.3s ease; }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+    .button-hover { transition: all 0.2s ease; }
+    .button-hover:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen">
+  <main class="max-w-6xl mx-auto p-6 space-y-8">
+    <header class="hidden">
+      <div class="flex items-center gap-3">
+        <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 3a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V5.1a7.5 7.5 0 012.4 1.386l1.49-.861a.75.75 0 011.025.275l1.5 2.598a.75.75 0 01-.274 1.025l-1.49.861c.092.39.14.797.14 1.216s-.048.827-.14 1.216l1.49.861a.75.75 0 01.274 1.025l-1.5 2.598a.75.75 0 01-1.025.274l-1.49-.86A7.5 7.5 0 0115 18.9V21a.75.75 0 01-.75.75h-3A.75.75 0 0110.5 21v-2.1a7.5 7.5 0 01-2.4-1.386l-1.49.861a.75.75 0 01-1.025-.274l-1.5-2.598a.75.75 0 01.274-1.025l1.49-.861c-.092-.39-.14-.797-.14-1.216s.048-.827.14-1.216l-1.49-.861a.75.75 0 01-.274-1.025l1.5-2.598a.75.75 0 011.025-.275l1.49.861A7.5 7.5 0 0110.5 5.1V3z"/></svg>
+        <h1 class="text-3xl font-bold text-white">Settings</h1>
+      </div>
+      <div class="text-sm text-slate-400">Manage data import/export</div>
+    </header>
+
+    <nav class="bg-slate-800/50 rounded-2xl p-2 flex flex-wrap gap-2 text-sm">
+      <a href="financial_summary.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Summary</a>
+      <a href="standalone_income_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Income</a>
+      <a href="standalone_expense_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Expenses</a>
+      <a href="standalone_payroll_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Payroll</a>
+      <a href="settings.html" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500">Settings</a>
+    </nav>
+
+    <section class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover space-y-4">
+      <div class="flex flex-wrap items-center gap-4 text-sm text-slate-300">
+        <span>Status: <span id="apiStatus" class="text-amber-300">Checking...</span></span>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-emerald-300">Income</h3>
+          <p class="text-sm text-slate-300">Import payouts or export current income records.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <label class="button-hover text-sm px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 cursor-pointer flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Import CSV<input id="settingsIncomeImport" type="file" accept=".csv" class="hidden" />
+          </label>
+          <button id="btnExportIncome" class="button-hover text-sm px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v12m0 0l4-4m-4 4l-4-4m12-6h4a2 2 0 012 2v12"/></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-rose-300">Expenses</h3>
+          <p class="text-sm text-slate-300">Import purchases and receipts, export current records.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <label class="button-hover text-sm px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 cursor-pointer flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Import CSV<input id="settingsExpensesImport" type="file" accept=".csv" class="hidden" />
+          </label>
+          <button id="btnExportExpenses" class="button-hover text-sm px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v12m0 0l4-4m-4 4l-4-4m12-6h4a2 2 0 012 2v12"/></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/50 p-6 rounded-2xl shadow-lg card-hover space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-blue-300">Payroll</h3>
+          <p class="text-sm text-slate-300">Import payroll runs or export current payouts.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3">
+          <label class="button-hover text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 cursor-pointer flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Import CSV<input id="settingsPayrollImport" type="file" accept=".csv" class="hidden" />
+          </label>
+          <button id="btnExportPayroll" class="button-hover text-sm px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v12m0 0l4-4m-4 4l-4-4m12-6h4a2 2 0 012 2v12"/></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function updateStatus(connected){ const el=document.getElementById('apiStatus'); if(!el) return; el.textContent = connected?'Connected':'Offline'; el.className = connected?'text-green-400':'text-rose-400'; }
+    async function ensureAPI(){ try{ if(!window.API) return false; const ok = API.available || await API.init(''); updateStatus(ok); return ok; } catch { updateStatus(false); return false; } }
+    function downloadBlob(blob, filename){ const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); }
+
+    function parseCSV(text){ const rows=[]; let i=0,field='',row=[],inQ=false; while(i<text.length){ const ch=text[i++]; if(inQ){ if(ch==='"'){ if(text[i]==='"'){ field+='"'; i++; } else inQ=false; } else field+=ch; } else { if(ch==='"') inQ=true; else if(ch===','){ row.push(field); field=''; } else if(ch==='\n'||ch==='\r'){ if(field!==''||row.length){ row.push(field); rows.push(row); row=[]; field=''; } } else field+=ch; } } if(field!==''||row.length){ row.push(field); rows.push(row);} return rows.filter(r=>r.length>1);}    
+    function toISODate(s){ if(!s) return ''; const v=String(s).trim(); const c=['yyyy-MM-dd','dd/MM/yyyy','MM/dd/yyyy','dd-MM-yyyy','yyyy/MM/dd']; let dt=luxon.DateTime.fromISO(v); if(!dt.isValid) dt=luxon.DateTime.fromSQL(v); for(const f of c){ if(dt.isValid) break; dt=luxon.DateTime.fromFormat(v,f);} return dt.isValid? dt.toISODate():''; }
+    function procIncomeCSV(csv){ const rows=parseCSV(csv); if(rows.length<2) return []; const h=rows[0].map(x=>x.trim().toLowerCase()); const i={date:h.indexOf('date'), source:h.indexOf('source'), processor:h.indexOf('processor'), amount:h.findIndex(x=>x.includes('amount')), fees:h.findIndex(x=>x.includes('fee')), notes:h.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; const date=toISODate(row[i.date]); if(!date) continue; out.push({ id: Math.random().toString(36).slice(2)+Date.now().toString(36), date, source: row[i.source]||'', processor: row[i.processor]||'', amount: Number(String(row[i.amount]||'0').replace(/[^0-9.\-]/g,''))||0, fees: Number(String(row[i.fees]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[i.notes]||'' }); } return out; }
+    function procExpenseCSV(csv){ const rows=parseCSV(csv); if(rows.length<2) return []; const h=rows[0].map(x=>x.trim().toLowerCase()); const i={date:h.indexOf('date'), category:h.indexOf('category'), seller:h.indexOf('seller'), source:h.indexOf('source'), items:h.findIndex(x=>x.includes('item')), order:h.findIndex(x=>x.startsWith('order')), total:h.findIndex(x=>x.includes('total')||x.includes('amount')), notes:h.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; const date=toISODate(row[i.date]); if(!date) continue; out.push({ id: Math.random().toString(36).slice(2)+Date.now().toString(36), date, category: row[i.category]||'Imported', seller: row[i.seller]||row[i.source]||'', items: row[i.items]||'', orderNumber: row[i.order]||'', total: Number(String(row[i.total]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[i.notes]||'', source: row[i.source]||row[i.seller]||'' }); } return out; }
+    function procPayrollCSV(csv){ const rows=parseCSV(csv); if(rows.length<2) return []; const h=rows[0].map(x=>x.trim().toLowerCase()); const i={date:h.indexOf('date'), employee:h.indexOf('employee'), amount:h.findIndex(x=>x.includes('amount')||x.includes('net')), notes:h.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; const date=toISODate(row[i.date]); const employee=row[i.employee]||''; if(!date||!employee) continue; out.push({ id: Math.random().toString(36).slice(2)+Date.now().toString(36), date, employee, amount: Number(String(row[i.amount]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[i.notes]||'' }); } return out; }
+
+    async function importGeneric(kind, records, keyFn){ if(!records.length) return 0; if(!(await ensureAPI())) throw new Error('Backend offline'); const existing = await API[kind].list(); const seen = new Set(existing.map(keyFn)); let added=0; for(const rec of records){ if(!seen.has(keyFn(rec))){ await API[kind].upsert(rec); seen.add(keyFn(rec)); added++; } } return added; }
+
+    document.getElementById('settingsIncomeImport').addEventListener('change', async e=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ try{ const items=procIncomeCSV(String(r.result||'')); const added=await importGeneric('income', items, x=>[x.date,(x.source||'').toLowerCase(),Number(x.amount||0).toFixed(2),Number(x.fees||0).toFixed(2)].join('|')); alert(`Imported ${added} income record(s)`);} catch(err){ console.error(err); alert('Import failed'); } finally { e.target.value=''; } }; r.readAsText(f); });
+    document.getElementById('settingsExpensesImport').addEventListener('change', async e=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ try{ const items=procExpenseCSV(String(r.result||'')); const added=await importGeneric('expenses', items, x=>[x.date,(x.seller||x.source||'').toLowerCase(),Number(x.total||0).toFixed(2),(x.orderNumber||'').toLowerCase()].join('|')); alert(`Imported ${added} expense record(s)`);} catch(err){ console.error(err); alert('Import failed'); } finally { e.target.value=''; } }; r.readAsText(f); });
+    document.getElementById('settingsPayrollImport').addEventListener('change', async e=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ try{ const items=procPayrollCSV(String(r.result||'')); const added=await importGeneric('payroll', items, x=>[x.date,(x.employee||'').toLowerCase(),Number(x.amount||0).toFixed(2)].join('|')); alert(`Imported ${added} payroll record(s)`);} catch(err){ console.error(err); alert('Import failed'); } finally { e.target.value=''; } }; r.readAsText(f); });
+
+    document.getElementById('btnExportIncome').addEventListener('click', async ()=>{ if(!(await ensureAPI())) return alert('Backend offline'); const blob = await API.income.export(); downloadBlob(blob, `income-${new Date().toISOString().slice(0,10)}.csv`); });
+    document.getElementById('btnExportExpenses').addEventListener('click', async ()=>{ if(!(await ensureAPI())) return alert('Backend offline'); const blob = await API.expenses.export(); downloadBlob(blob, `expenses-${new Date().toISOString().slice(0,10)}.csv`); });
+    document.getElementById('btnExportPayroll').addEventListener('click', async ()=>{ if(!(await ensureAPI())) return alert('Backend offline'); const blob = await API.payroll.export(); downloadBlob(blob, `payroll-${new Date().toISOString().slice(0,10)}.csv`); });
+
+    (async ()=>{ await ensureAPI(); })();
+  </script>
+</body>
+</html>

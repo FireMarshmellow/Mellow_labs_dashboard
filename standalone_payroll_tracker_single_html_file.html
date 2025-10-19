@@ -28,7 +28,7 @@
   <main class="max-w-6xl mx-auto p-6 space-y-8">
     <header class="hidden">
       <div class="flex items-center gap-3">
-        <svg class="w-9 h-9 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-9 h-9 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h3.5a1.5 1.5 0 110 3H6v11a2 2 0 01-2 2h-.5A1.5 1.5 0 012.5 18V7.5A1.5 1.5 0 014 6zm16 0a2 2 0 00-2-2h-3.5a1.5 1.5 0 100 3H18v11a2 2 0 002 2h.5a1.5 1.5 0 001.5-1.5V7.5A1.5 1.5 0 0020 6z"></path>
         </svg>
         <div>
@@ -49,9 +49,14 @@
       <a href="financial_summary.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Summary</a>
       <a href="standalone_income_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Income</a>
       <a href="standalone_expense_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Expenses</a>
-      <a href="standalone_payroll_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500">Payroll</a>
+      <a href="standalone_payroll_tracker_single_html_file.html" class="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500">Payroll</a>
       <a href="settings.html" class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600">Settings</a>
+      <button id="btnToggleAddPayroll" class="ml-auto px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 flex items-center gap-2" title="Add Payroll">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="hidden sm:inline">Add</span>
+      </button>
     </nav>
+    <div id="addPayrollMount"></div>
 
     <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 relative z-50 overflow-visible isolate">
       <div class="flex flex-col lg:flex-row lg:items-end gap-4">
@@ -80,7 +85,7 @@
             Search
             <input id="search" placeholder="Find by employee or notes..." class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
           </label>
-          <button id="btnApplyFilters" class="button-hover px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-sm h-fit mt-auto">
+          <button id="btnApplyFilters" class="button-hover px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-sm h-fit mt-auto">
             Apply
           </button>
         </div>
@@ -88,7 +93,7 @@
     </section>
 
     <!-- Add Payroll Form -->
-    <section class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 relative z-50 overflow-visible">
+    <section id="addPayrollSection" class="bg-slate-800/60 rounded-2xl p-6 card-hover space-y-4 relative z-50 overflow-visible hidden">
       <div class="flex items-center justify-between">
         <h2 class="text-lg font-semibold text-slate-100">Add Payroll</h2>
         <span class="text-xs text-slate-400">Create a new payroll entry</span>
@@ -100,8 +105,7 @@
         </label>
         <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-2">
           Employee
-          <select id="payEmployeeSelect" class="hidden"></select>
-          <button id="payEmployeePicker" type="button" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm text-left hover:bg-slate-800/60">Select...</button>
+          <select id="payEmployeeSelect" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm"></select>
           <input id="payEmployeeCustom" type="text" placeholder="Custom employee" class="mt-2 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm hidden" />
         </label>
         <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
@@ -113,7 +117,7 @@
           <input id="payNotes" type="text" placeholder="Optional notes" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
         </label>
         <div class="md:col-span-3 flex items-end gap-2">
-          <button id="btnAddPayroll" class="button-hover flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-sm">Add</button>
+          <button id="btnAddPayroll" class="button-hover flex-1 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-sm">Add</button>
           <button id="btnCancelPayrollEdit" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm hidden">Cancel</button>
         </div>
       </div>
@@ -123,7 +127,7 @@
     <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
         <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Total Payroll</p>
-        <p id="statTotal" class="text-2xl font-semibold text-blue-300">£0.00</p>
+        <p id="statTotal" class="text-2xl font-semibold text-amber-300">£0.00</p>
       </div>
       <div class="bg-slate-800/60 rounded-2xl p-5 card-hover">
         <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Average Payout</p>
@@ -281,9 +285,10 @@
         }
         return sortDir==='asc'? cmp : -cmp;
       });
-      updateSortIndicators();updateStats();
+      updateSortIndicators();
+      updateStats();
       updateCharts();
-      updateSortIndicators();`r`n      renderTable();
+      renderTable();
     }
 
     function updateStats() {
@@ -349,8 +354,8 @@
             data: [],
             tension: 0.35,
             fill: true,
-            borderColor: 'rgb(96,165,250)',
-            backgroundColor: 'rgba(96,165,250,0.25)',
+            borderColor: 'rgb(251,191,36)',
+            backgroundColor: 'rgba(251,191,36,0.25)',
             pointRadius: 2,
           }],
         },
@@ -375,8 +380,8 @@
           datasets: [{
             label: 'Total Paid',
             data: [],
-            backgroundColor: 'rgba(96,165,250,0.65)',
-            borderColor: 'rgba(96,165,250,0.95)',
+            backgroundColor: 'rgba(251,191,36,0.65)',
+            borderColor: 'rgba(251,191,36,0.95)',
             borderWidth: 1,
           }],
         },
@@ -394,8 +399,6 @@
         },
       });
     }
-
-        }
 
     async function bootstrap() {
       try {
@@ -415,6 +418,31 @@
       applyFilters();
     });
     document.getElementById('btnApplyFilters').addEventListener('click', applyFilters);
+    // Mount Add Payroll under the nav
+    (function mountAddPayrollSection(){
+      const mount = document.getElementById('addPayrollMount');
+      const section = document.getElementById('addPayrollSection');
+      if (mount && section) mount.insertAdjacentElement('afterend', section);
+    })();
+    // Toggle Add Payroll dropdown from nav button
+    (function initPayrollToggle(){
+      const toggleBtn = document.getElementById('btnToggleAddPayroll');
+      const addSection = document.getElementById('addPayrollSection');
+      if (toggleBtn && addSection) {
+        toggleBtn.addEventListener('click', () => {
+          const isHidden = addSection.classList.contains('hidden');
+          if (isHidden) {
+            addSection.classList.remove('hidden');
+            toggleBtn.classList.add('ring-2','ring-amber-300');
+            const first = document.getElementById('payDate') || document.getElementById('payEmployeeSelect');
+            if (first) first.focus();
+          } else {
+            addSection.classList.add('hidden');
+            toggleBtn.classList.remove('ring-2','ring-amber-300');
+          }
+        });
+      }
+    })();
     refs.quickSelect.addEventListener('change', () => {
       setQuickRange(refs.quickSelect.value);
       applyFilters();
@@ -521,7 +549,20 @@
       if (picker){ picker.addEventListener('click', ()=> buildOverlayMenu(picker, empSel)); empSel.addEventListener('change', syncPicker); syncPicker(); }
       if ((combined||[]).length === 0 && empSel) { empSel.value = '__custom'; if (empCustomEl) empCustomEl.classList.remove('hidden'); syncPicker(); }
       function setMsg(t, ok){ if(!msgEl) return; msgEl.textContent=t||''; msgEl.className='text-xs ' + (ok?'text-emerald-300':'text-amber-300'); }
-      function setEditMode(on){.classList.add('hidden'); }
+      function setEditMode(on){
+        if (!addBtn || !cancelBtn) return;
+        if (on) {
+          addBtn.textContent = 'Save';
+          addBtn.classList.remove('bg-amber-600','hover:bg-amber-500','bg-blue-600','hover:bg-blue-500');
+          addBtn.classList.add('bg-emerald-600','hover:bg-emerald-500');
+          cancelBtn.classList.remove('hidden');
+        } else {
+          payEditingId = null;
+          addBtn.textContent = 'Add';
+          addBtn.classList.remove('bg-emerald-600','hover:bg-emerald-500');
+          addBtn.classList.add('bg-amber-600','hover:bg-amber-500');
+          cancelBtn.classList.add('hidden');
+        }
       }
       if (cancelBtn) cancelBtn.addEventListener('click', ()=> setEditMode(false));
 
@@ -538,10 +579,17 @@
           const payload = payEditingId ? { id: payEditingId, date, employee, amount, notes } : { date, employee, amount, notes };
           const saved = await API.payroll.upsert(payload);
           setMsg(payEditingId ? 'Payroll updated.' : 'Payroll added.', true);
-          if (employee && empSel?.value==='__custom') { const list = unique([ ...loadList(), employee ]); saveList(list); populateSelect(empSel, list, empCustomEl); empSel.value = employee; }
+          if (employee && empSel?.value==='__custom') { const list = unique([ ...loadList(), employee ]); saveList(list); const merged = unique([ ...DEFAULT_EMPLOYEES, ...list ]); populateSelect(empSel, merged, empCustomEl); empSel.value = employee; if (picker) { (function(){ const v=empSel.value||''; const opt = Array.from(empSel.options||[]).find(o=>o.value===v); picker.textContent = (opt&&opt.textContent)?opt.textContent:'Select...'; })(); } }
           await loadData(); const d=new Date(saved.date); if(refs.startDate.value && new Date(refs.startDate.value)>d) refs.startDate.valueAsDate=d; if(refs.endDate.value && new Date(refs.endDate.value)<d) refs.endDate.valueAsDate=d; applyFilters();
           amountEl.value=''; notesEl.value=''; if(empSel?.value==='__custom' && empCustomEl) empCustomEl.value='';
           if (payEditingId) setEditMode(false);
+          // Hide the Add Payroll section after a successful add when not editing
+          if (!payEditingId) {
+            const addSection = document.getElementById('addPayrollSection');
+            const toggleBtn = document.getElementById('btnToggleAddPayroll');
+            if (addSection) addSection.classList.add('hidden');
+            if (toggleBtn) toggleBtn.classList.remove('ring-2','ring-amber-300');
+          }
         }catch(err){ console.error(err); setMsg('Failed to save payroll.', false); }
       });
 
@@ -555,7 +603,21 @@
           } catch(err){ console.error(err); alert('Failed to delete.'); }
         } else if(action==='edit'){
           const rec = state.all.find(r=>r.id===id); if(!rec) return;
-          try{ if(dateEl) dateEl.value=rec.date||''; setSelectValue(empSel, empCustomEl, rec.employee||''); if(amountEl) amountEl.value=String(rec.amount||0); if(notesEl) notesEl.value=rec.notes||''; payEditingId=id; setEditMode(true); } catch(err){ console.error(err); }
+          try{
+            // Ensure Add Payroll section is visible when entering edit mode
+            const addSection = document.getElementById('addPayrollSection');
+            const toggleBtn = document.getElementById('btnToggleAddPayroll');
+            if (addSection && addSection.classList.contains('hidden')) {
+              addSection.classList.remove('hidden');
+              if (toggleBtn) toggleBtn.classList.add('ring-2','ring-amber-300');
+            }
+            if(dateEl) dateEl.value=rec.date||'';
+            setSelectValue(empSel, empCustomEl, rec.employee||'');
+            if (picker) { (function(){ const v=empSel.value||''; const opt = Array.from(empSel.options||[]).find(o=>o.value===v); picker.textContent = (opt&&opt.textContent)?opt.textContent:'Select...'; })(); }
+            if(amountEl) amountEl.value=String(rec.amount||0);
+            if(notesEl) notesEl.value=rec.notes||'';
+            payEditingId=id; setEditMode(true);
+          } catch(err){ console.error(err); }
         }
       });
     })();
