@@ -25,6 +25,12 @@ A lightweight local dashboard for tracking income, expenses and payroll, with a 
 
 The app stores data in `finance.db` (SQLite). This file is ignored by Git.
 
+### Attachments (receipts/files)
+- Income and Expenses support attaching one or more documents when adding a new entry.
+- Click the “Details” button on a row to see attachments; links open in a new tab.
+- Files are stored on disk under the directory specified by `UPLOADS_DIR` (default: `/data/uploads` in Docker, `./uploads` when running locally).
+- To persist attachments in Docker, ensure `UPLOADS_DIR` points inside your data volume (both provided compose files set `UPLOADS_DIR=/data/uploads`).
+
 ## Customization
 - The summary page has a “Customize” panel to toggle datasets, set time unit (day/week/month), choose pie type (pie/doughnut), and pick series colors. Preferences are stored in `localStorage`.
 

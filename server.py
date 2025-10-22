@@ -6,10 +6,12 @@ from pathlib import Path
 from uuid import uuid4
 
 from flask import Flask, jsonify, request, send_from_directory, g, Response
+from werkzeug.utils import secure_filename
 
 ROOT = Path(__file__).resolve().parent
 # Allow overriding DB path via env for Docker persistence
 DB_PATH = Path(os.environ.get("DATABASE_PATH") or (ROOT / "finance.db"))
+UPLOAD_DIR = Path(os.environ.get("UPLOADS_DIR") or (ROOT / "uploads"))
 
 app = Flask(__name__)
 
@@ -54,6 +56,7 @@ def init_db():
             total REAL DEFAULT 0,
             notes TEXT,
             source TEXT,
+            paid_from TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
@@ -67,13 +70,70 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS attachments (
+            id TEXT PRIMARY KEY,
+            kind TEXT NOT NULL CHECK (kind IN ('income','expenses')),
+            record_id TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            stored_name TEXT NOT NULL,
+            mime_type TEXT,
+            size INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_attachments_kind_record ON attachments(kind, record_id);
         """
     )
     db.commit()
+    # Migrations for existing databases
+    try:
+        # Add paid_from to expenses if missing
+        cols = {r[1] for r in db.execute("PRAGMA table_info(expenses)").fetchall()}
+        if "paid_from" not in cols:
+            db.execute("ALTER TABLE expenses ADD COLUMN paid_from TEXT")
+            db.commit()
+    except Exception:
+        pass
+    # Backfill default value for paid_from if empty
+    try:
+        db.execute(
+            "UPDATE expenses SET paid_from = ? WHERE paid_from IS NULL OR paid_from = ''",
+            ("Tomasz Burzy Personal",),
+        )
+        db.commit()
+    except Exception:
+        pass
+    # Ensure upload base directory exists
+    try:
+        UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
 
 
 def generate_id() -> str:
     return uuid4().hex
+
+
+def _ensure_record_dir(kind: str, record_id: str) -> Path:
+    path = UPLOAD_DIR / kind / record_id
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _attachment_row_to_dict(row: sqlite3.Row) -> dict:
+    if not row:
+        return None
+    rel_path = f"uploads/{row['kind']}/{row['record_id']}/{row['stored_name']}"
+    return {
+        "id": row["id"],
+        "kind": row["kind"],
+        "recordId": row["record_id"],
+        "name": row["original_name"],
+        "mime": row["mime_type"] or "",
+        "size": int(row["size"] or 0),
+        "url": f"/{rel_path}",
+        "createdAt": row["created_at"],
+    }
 
 
 RESOURCE_CONFIG = {
@@ -120,6 +180,7 @@ RESOURCE_CONFIG = {
             "total",
             "notes",
             "source",
+            "paid_from",
         ],
         "to_db": lambda payload: {
             "id": str(payload.get("id") or generate_id()),
@@ -131,6 +192,7 @@ RESOURCE_CONFIG = {
             "total": float(payload.get("total") or payload.get("price") or 0),
             "notes": (payload.get("notes") or "").strip(),
             "source": (payload.get("source") or "").strip(),
+            "paid_from": (payload.get("paidFrom") or payload.get("paid_from") or "").strip(),
         },
         "from_db": lambda row: {
             "id": row["id"],
@@ -142,8 +204,9 @@ RESOURCE_CONFIG = {
             "total": float(row["total"] or 0),
             "notes": row["notes"] or "",
             "source": row["source"] or "",
+            "paidFrom": row["paid_from"] or "",
         },
-        "csv_header": ["Date", "Category", "Seller", "Item(s)", "Order #", "TotalGBP", "Notes", "Source"],
+        "csv_header": ["Date", "Category", "Seller", "Item(s)", "Order #", "TotalGBP", "Notes", "Source", "Paid From"],
         "csv_row": lambda rec: [
             rec["date"],
             rec["category"],
@@ -153,6 +216,7 @@ RESOURCE_CONFIG = {
             f'{rec["total"]:.2f}',
             rec["notes"],
             rec["source"],
+            rec.get("paidFrom", ""),
         ],
     },
     "payroll": {
@@ -206,6 +270,82 @@ def get_record(kind: str, record_id: str):
     return config["from_db"](row) if row else None
 
 
+def list_attachments(kind: str, record_id: str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, kind, record_id, original_name, stored_name, mime_type, size, created_at FROM attachments WHERE kind = ? AND record_id = ? ORDER BY created_at DESC",
+        (kind, record_id),
+    ).fetchall()
+    return [_attachment_row_to_dict(r) for r in rows]
+
+
+def create_attachments(kind: str, record_id: str, files) -> list:
+    saved = []
+    if not files:
+        return saved
+    record_dir = _ensure_record_dir(kind, record_id)
+    db = get_db()
+    for fs in files:
+        if not fs or not getattr(fs, "filename", ""):
+            continue
+        original = fs.filename
+        safe = secure_filename(original) or "file"
+        stored = f"{uuid4().hex}_{safe}"
+        dst = record_dir / stored
+        fs.save(dst)
+        try:
+            size = dst.stat().st_size
+        except Exception:
+            size = 0
+        att_id = uuid4().hex
+        db.execute(
+            """
+            INSERT INTO attachments (id, kind, record_id, original_name, stored_name, mime_type, size)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (att_id, kind, record_id, original, stored, getattr(fs, "mimetype", None), size),
+        )
+        saved.append(
+            {
+                "id": att_id,
+                "kind": kind,
+                "recordId": record_id,
+                "name": original,
+                "mime": getattr(fs, "mimetype", "") or "",
+                "size": int(size),
+                "url": f"/uploads/{kind}/{record_id}/{stored}",
+            }
+        )
+    db.commit()
+    return saved
+
+
+def get_attachment(att_id: str):
+    db = get_db()
+    row = db.execute(
+        "SELECT id, kind, record_id, original_name, stored_name, mime_type, size, created_at FROM attachments WHERE id = ?",
+        (att_id,),
+    ).fetchone()
+    return row
+
+
+def delete_attachment(att_id: str) -> bool:
+    row = get_attachment(att_id)
+    if not row:
+        return False
+    # attempt to delete file from disk
+    try:
+        file_path = UPLOAD_DIR / row["kind"] / row["record_id"] / row["stored_name"]
+        if file_path.exists():
+            file_path.unlink(missing_ok=True)  # type: ignore[arg-type]
+    except Exception:
+        pass
+    db = get_db()
+    res = db.execute("DELETE FROM attachments WHERE id = ?", (att_id,))
+    db.commit()
+    return res.rowcount > 0
+
+
 def upsert_record(kind: str, payload: dict):
     config = RESOURCE_CONFIG[kind]
     row_data = config["to_db"](payload or {})
@@ -236,8 +376,28 @@ def delete_record(kind: str, record_id: str):
         f"DELETE FROM {config['table']} WHERE id = ?",
         (record_id,),
     )
+    deleted = result.rowcount > 0
+    # If a record was deleted, also remove its attachments (DB + files)
+    if deleted and kind in ("income", "expenses"):
+        try:
+            # remove files on disk
+            base = UPLOAD_DIR / kind / record_id
+            if base.exists() and base.is_dir():
+                for p in base.iterdir():
+                    try:
+                        if p.is_file():
+                            p.unlink(missing_ok=True)  # type: ignore[arg-type]
+                    except Exception:
+                        pass
+                try:
+                    base.rmdir()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        db.execute("DELETE FROM attachments WHERE kind = ? AND record_id = ?", (kind, record_id))
     db.commit()
-    return result.rowcount > 0
+    return deleted
 
 
 def clear_records(kind: str):
@@ -268,8 +428,17 @@ def version():
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Accept"
     return response
+
+
+@app.route("/api/<path:_any>", methods=["OPTIONS"])
+def cors_preflight(_any):
+    return ("", 204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Accept",
+    })
 
 
 @app.route("/api/ping")
@@ -293,6 +462,53 @@ def download_csv(kind):
         mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.route("/api/<kind>/<record_id>/attachments", methods=["GET", "POST"])
+def attachments_collection(kind, record_id):
+    if kind not in ("income", "expenses"):
+        return jsonify({"error": "Unsupported kind for attachments"}), 400
+    # Ensure record exists
+    rec = get_record(kind, record_id)
+    if not rec:
+        return jsonify({"error": "Parent record not found"}), 404
+    if request.method == "GET":
+        return jsonify(list_attachments(kind, record_id))
+    # POST: upload files via multipart form
+    if not request.files:
+        return jsonify({"error": "No files uploaded"}), 400
+    files = request.files.getlist("files") or []
+    saved = create_attachments(kind, record_id, files)
+    return jsonify(saved)
+
+
+@app.route("/api/attachments/<att_id>", methods=["GET", "DELETE"])
+def attachments_detail(att_id):
+    row = get_attachment(att_id)
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    if request.method == "GET":
+        return jsonify(_attachment_row_to_dict(row))
+    # DELETE
+    ok = delete_attachment(att_id)
+    return (jsonify({"deleted": True}), 200) if ok else (jsonify({"error": "Not found"}), 404)
+
+
+@app.route("/api/attachments/<att_id>/download")
+def attachments_download(att_id):
+    row = get_attachment(att_id)
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    folder = UPLOAD_DIR / row["kind"] / row["record_id"]
+    filename = row["stored_name"]
+    # return with original filename hint
+    resp = send_from_directory(folder, filename)
+    try:
+        disp = f"inline; filename={row['original_name']}"
+        resp.headers["Content-Disposition"] = disp
+    except Exception:
+        pass
+    return resp
 
 
 @app.route("/api/<kind>", methods=["GET", "POST", "DELETE"])

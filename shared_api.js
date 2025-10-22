@@ -28,16 +28,20 @@
     local: { income: [], expenses: [], payroll: [] },
 
     async init(base=''){
-      this.base = base || '';
-      // Try live server first
-      try {
-        const r = await fetch(this.base + '/api/ping');
-        if (r.ok) {
-          this.available = true;
-          this.mode = 'server';
-          return true;
-        }
-      } catch {}
+      function defaultBase(){
+        try {
+          if (typeof location !== 'undefined' && /^https?:/i.test(location.protocol)) return location.origin || '';
+        } catch {}
+        return 'http://127.0.0.1:3000';
+      }
+      this.base = base || defaultBase();
+      // Try live server first (try current base, then localhost if different)
+      const basesToTry = [this.base];
+      if (!/^https?:/i.test(this.base)) basesToTry.push('http://127.0.0.1:3000');
+      else if (!/127\.0\.0\.1|localhost/.test(this.base)) basesToTry.push('http://127.0.0.1:3000');
+      for (const b of basesToTry) {
+        try { const r = await fetch(b + '/api/ping'); if (r.ok) { this.base = b; this.available = true; this.mode = 'server'; return true; } } catch {}
+      }
 
       // Fallback: try bundled db.json
       try {
@@ -85,7 +89,10 @@
     async list(kind){
       if (this.mode === 'server') {
         const r = await fetch(this.base + '/api/' + kind);
-        if (!r.ok) throw new Error('Request failed');
+        if (!r.ok) {
+          const t = await r.text().catch(()=>r.statusText);
+          throw new Error(`List failed (${r.status}): ${t}`);
+        }
         return r.json();
       }
       return Promise.resolve((this.local[kind] || []).slice());
@@ -94,7 +101,10 @@
     async upsert(kind, rec){
       if (this.mode === 'server') {
         const r = await fetch(this.base + '/api/' + kind, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(rec) });
-        if(!r.ok) throw new Error('Upsert failed');
+        if(!r.ok) {
+          const t = await r.text().catch(()=>r.statusText);
+          throw new Error(`Upsert failed (${r.status}): ${t}`);
+        }
         return r.json();
       }
       const row = Object.assign({}, rec);
@@ -152,6 +162,35 @@
     income:{ list(){ return API.list('income'); }, upsert(rec){ return API.upsert('income',rec); }, remove(id){ return API.remove('income',id); }, clear(){ return API.clear('income'); }, export(){ return API.export('income'); } },
     expenses:{ list(){ return API.list('expenses'); }, upsert(rec){ return API.upsert('expenses',rec); }, remove(id){ return API.remove('expenses',id); }, clear(){ return API.clear('expenses'); }, export(){ return API.export('expenses'); } },
     payroll:{ list(){ return API.list('payroll'); }, upsert(rec){ return API.upsert('payroll',rec); }, remove(id){ return API.remove('payroll',id); }, clear(){ return API.clear('payroll'); }, export(){ return API.export('payroll'); } },
+
+    attachments: {
+      async list(kind, recordId){
+        if (API.mode === 'server') {
+          const r = await fetch(API.base + `/api/${encodeURIComponent(kind)}/${encodeURIComponent(recordId)}/attachments`);
+          if (!r.ok) throw new Error('Failed to list attachments');
+          return r.json();
+        }
+        return [];
+      },
+      async upload(kind, recordId, files){
+        if (!files || files.length === 0) return [];
+        if (API.mode === 'server') {
+          const fd = new FormData();
+          for (const f of Array.from(files)) fd.append('files', f);
+          const r = await fetch(API.base + `/api/${encodeURIComponent(kind)}/${encodeURIComponent(recordId)}/attachments`, { method: 'POST', body: fd });
+          if (!r.ok) throw new Error('Failed to upload attachments');
+          return r.json();
+        }
+        return [];
+      },
+      async remove(attachmentId){
+        if (API.mode === 'server'){
+          const r = await fetch(API.base + `/api/attachments/${encodeURIComponent(attachmentId)}`, { method: 'DELETE' });
+          return r.ok;
+        }
+        return true;
+      }
+    }
   };
   window.API = API;
 })();

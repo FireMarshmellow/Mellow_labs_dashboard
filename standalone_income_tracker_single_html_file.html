@@ -126,6 +126,11 @@
           Notes
           <input id="incomeNotes" type="text" placeholder="Optional notes" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
         </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-2">
+          Documents
+          <input id="incomeFiles" type="file" multiple class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          <span class="text-[10px] text-slate-400">Optional: attach receipts or files</span>
+        </label>
         <div class="md:col-span-2 lg:col-span-1 flex items-end gap-2">
           <button id="btnAddIncome" class="button-hover flex-1 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-sm">Add</button>
           <button id="btnCancelEdit" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm hidden">Cancel</button>
@@ -455,19 +460,28 @@
     function renderTable() {
       refs.summary.textContent = `Showing ${state.filtered.length} entr${state.filtered.length === 1 ? 'y' : 'ies'}`;
       refs.tableBody.innerHTML = state.filtered.map(rec => `
-        <tr class="transition-colors">
+        <tr class="transition-colors" data-row-id="${rec.id}">
+          <td class="py-3 px-3"><button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-toggle="details" data-id="${rec.id}">Details</button></td>
           <td class="py-3 px-3 whitespace-nowrap text-slate-200">${rec.date}</td>
           <td class="py-3 px-3 text-slate-100">${rec.source}</td>
           <td class="py-3 px-3 text-slate-300">${rec.processor || 'N/A'}</td>
           <td class="py-3 px-3 text-right text-emerald-300">${gbp.format(rec.gross)}</td>
           <td class="py-3 px-3 text-right text-rose-300">${gbp.format(rec.fees)}</td>
           <td class="py-3 px-3 text-right text-blue-300 font-medium">${gbp.format(rec.net)}</td>
-          <td class="py-3 px-3 text-slate-300">${rec.notes || 'N/A'}</td>
           <td class="py-3 px-3 text-right whitespace-nowrap">
             <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-action="edit" data-id="${rec.id}">Edit</button>
             <button class="ml-2 px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-xs" data-action="delete" data-id="${rec.id}">Delete</button>
           </td>
         </tr>
+        <tr id="inc-details-${rec.id}" class="hidden bg-slate-800/40"><td colspan="8" class="px-3 py-3">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+            <div class="md:col-span-3"><span class="text-slate-400">Notes:</span> <span class="text-slate-200">${rec.notes || 'N/A'}</span></div>
+            <div class="md:col-span-4">
+              <div class="text-slate-400 mb-1">Attachments</div>
+              <ul id="inc-att-list-${rec.id}" class="list-disc list-inside text-slate-200 text-sm"></ul>
+            </div>
+          </div>
+        </td></tr>
       `).join('');
     }
 
@@ -499,6 +513,7 @@
       const amountEl = document.getElementById('incomeAmount');
       const feesEl = document.getElementById('incomeFees');
       const notesEl = document.getElementById('incomeNotes');
+      const filesEl = document.getElementById('incomeFiles');
 
       function setEditMode(on){
         if (!addBtn || !cancelBtn) return;
@@ -522,6 +537,25 @@
 
       if (refs.tableBody) {
         refs.tableBody.addEventListener('click', async (e)=>{
+          const toggle = e.target.closest('[data-toggle="details"]');
+          if (toggle) {
+            const tid = toggle.dataset.id;
+            const row = document.getElementById('inc-details-'+tid);
+            if (!row) return;
+            const willShow = row.classList.contains('hidden');
+            row.classList.toggle('hidden');
+            if (willShow) {
+              try {
+                await ensureApi();
+                const atts = await API.attachments.list('income', tid);
+                const list = document.getElementById('inc-att-list-'+tid);
+                if (list) {
+                  list.innerHTML = (atts||[]).map(a => `<li><a class="text-blue-300 hover:underline" href="${a.url}" target="_blank" rel="noopener">${a.name}</a> <span class="text-slate-400 text-xs">(${a.size||0} bytes)</span></li>`).join('') || '<li class="text-slate-400 list-none">No attachments</li>';
+                }
+              } catch (err) { console.error(err); }
+            }
+            return;
+          }
           const btn = e.target.closest('button[data-action]');
           if (!btn) return;
           const id = btn.dataset.id;
@@ -625,6 +659,8 @@
       const msgEl = document.getElementById('addIncomeMsg');
       const btn = document.getElementById('btnAddIncome');
       if (!btn) return;
+      const filesEl = document.getElementById('incomeFiles');  // FIX: ensure filesEl exists in this scope
+
 
       const STORAGE = {
         sources: 'income.customSources.v1',
@@ -679,6 +715,14 @@
           const saved = await API.income.upsert(payload);
           setMsg(isEditing ? 'Income updated.' : 'Income added.', true);
 
+          // Upload attachments if any
+          if (filesEl && filesEl.files && filesEl.files.length) {
+            setMsg('Uploading attachments...', true);
+            try { await API.attachments.upload('income', saved.id, filesEl.files); setMsg('Income saved + attachments uploaded.', true); }
+            catch (err) { console.error(err); setMsg('Income saved but failed to upload some files.', false); }
+            filesEl.value = '';
+          }
+
           // Persist custom values for reuse
           if (source && (!defaults.sources.includes(source))) {
             const list = unique([ ...loadList(STORAGE.sources), source ]); saveList(STORAGE.sources, list); populateSelect(sourceSel, unique([ ...defaults.sources, ...list ]), sourceCustomEl); sourceSel.value = source; }
@@ -698,6 +742,7 @@
           notesEl.value = '';
           if (sourceSel?.value==='__custom' && sourceCustomEl) sourceCustomEl.value='';
           if (procSel?.value==='__custom' && procCustomEl) procCustomEl.value='';
+          if (filesEl) filesEl.value = '';
 
           // Exit edit mode if we were editing
           if (isEditing) {
@@ -721,7 +766,7 @@
           }
         } catch (err) {
           console.error(err);
-          setMsg('Failed to add income. Check server connection.', false);
+          setMsg('Failed to add income. Check server connection' + (err && err.message ? ': ' + err.message : ''), false);
         }
       });
     })();

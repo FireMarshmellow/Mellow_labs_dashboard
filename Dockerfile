@@ -5,6 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=3000 \
     DATABASE_PATH=/data/finance.db \
+    UPLOADS_DIR=/data/uploads \
     APP_VERSION=${APP_VERSION}
 
 WORKDIR /app

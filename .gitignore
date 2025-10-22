@@ -23,6 +23,7 @@ finance.db
 dist/
 build/
 coverage/
+uploads/
 
 # Editor/OS
 .vscode/

@@ -130,8 +130,17 @@
           <input id="expTotal" type="number" step="0.01" min="0" placeholder="0.00" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
         </label>
         <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-3">
+          Paid From
+          <input id="expPaidFrom" type="text" placeholder="e.g. Tomasz Burzy Personal" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-3">
           Notes
           <input id="expNotes" type="text" placeholder="Optional notes" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-3">
+          Documents
+          <input id="expFiles" type="file" multiple class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          <span class="text-[10px] text-slate-400">Optional: attach receipts or files</span>
         </label>
         <div class="md:col-span-3 flex items-end gap-2">
           <button id="btnAddExpense" class="button-hover flex-1 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm">Add</button>
@@ -273,6 +282,7 @@
         category: rec.category || 'Uncategorised',
         seller: rec.seller || rec.source || 'Unknown',
         source: rec.source || rec.seller || '',
+        paidFrom: rec.paidFrom || rec.paid_from || '',
         items: rec.items || '',
         orderNumber: rec.orderNumber || '',
         total,
@@ -333,7 +343,7 @@
         if (start && d < start) return false;
         if (end && d > end) return false;
         if (!q) return true;
-        const haystack = [rec.category, rec.seller, rec.items, rec.notes, rec.orderNumber].join(' ').toLowerCase();
+        const haystack = [rec.category, rec.seller, rec.items, rec.notes, rec.orderNumber, rec.paidFrom].join(' ').toLowerCase();
         return haystack.includes(q);
       });
 
@@ -500,11 +510,16 @@
             <div><span class="text-slate-400">Seller:</span> <span class="text-slate-200">${rec.seller||'N/A'}</span></div>
             <div><span class="text-slate-400">Order #:</span> <span class="text-slate-200">${rec.orderNumber||'N/A'}</span></div>
             <div><span class="text-slate-400">Source:</span> <span class="text-slate-200">${rec.source||'N/A'}</span></div>
+            <div><span class="text-slate-400">Paid From:</span> <span class="text-slate-200">${rec.paidFrom||'N/A'}</span></div>
             <div class="md:col-span-1 md:col-start-4 text-right">
               <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-action="edit" data-id="${rec.id}">Edit</button>
               <button class="ml-2 px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-xs" data-action="delete" data-id="${rec.id}">Delete</button>
             </div>
             <div class="md:col-span-4"><span class="text-slate-400">Notes:</span> <span class="text-slate-200">${rec.notes||'N/A'}</span></div>
+            <div class="md:col-span-4">
+              <div class="text-slate-400 mb-1">Attachments</div>
+              <ul id="exp-att-list-${rec.id}" class="list-disc list-inside text-slate-200 text-sm"></ul>
+            </div>
           </div>
         </td></tr>
       `).join('');
@@ -521,7 +536,10 @@
       const itemsEl = document.getElementById('expItems');
       const orderEl = document.getElementById('expOrder');
       const totalEl = document.getElementById('expTotal');
+      const paidFromEl = document.getElementById('expPaidFrom');
       const notesEl = document.getElementById('expNotes');
+      if (paidFromEl && !paidFromEl.value) paidFromEl.value = 'Tomasz Burzy Personal';
+      const filesEl = document.getElementById('expFiles');
       const addBtn = document.getElementById('btnAddExpense');
       const cancelBtn = document.getElementById('btnCancelExpenseEdit');
       const msgEl = document.getElementById('addExpenseMsg');
@@ -584,14 +602,23 @@
           const orderNumber = (orderEl?.value||'').trim();
           const total = Number(totalEl?.value||0);
           const notes = (notesEl?.value||'').trim();
+          const paidFrom = (paidFromEl?.value||'').trim();
           if(!date) return setMsg('Please select a date', false);
           if(!isFinite(total) || total<=0) return setMsg('Total must be greater than 0', false);
           const source = (sourceSel?.value==='__custom' ? (sourceCustomEl?.value||'').trim() : (sourceSel?.value||'').trim());
           if (categorySel?.value==='__custom' && !category) return setMsg('Enter a custom category', false);
           if (sourceSel?.value==='__custom' && !source) return setMsg('Enter a custom source', false);
-          const payload = expEditingId ? { id: expEditingId, date, category, seller, items, orderNumber, total, notes, source } : { date, category, seller, items, orderNumber, total, notes, source };
+          const payload = expEditingId ? { id: expEditingId, date, category, seller, items, orderNumber, total, notes, source, paidFrom } : { date, category, seller, items, orderNumber, total, notes, source, paidFrom };
           const saved = await API.expenses.upsert(payload);
           setMsg(expEditingId ? 'Expense updated.' : 'Expense added.', true);
+
+          // Upload files if present
+          if (filesEl && filesEl.files && filesEl.files.length) {
+            setMsg('Uploading attachments...', true);
+            try { await API.attachments.upload('expenses', saved.id, filesEl.files); setMsg('Expense saved + attachments uploaded.', true); }
+            catch (err) { console.error(err); setMsg('Expense saved but failed to upload some files.', false); }
+            filesEl.value = '';
+          }
 
           // Persist custom values
           if (category && !defaults.categories.includes(category)) {
@@ -604,7 +631,7 @@
           if (refs.endDate.value && new Date(refs.endDate.value) < d) refs.endDate.valueAsDate = d;
           applyFilters();
           // clear light fields
-          totalEl.value=''; notesEl.value='';
+          totalEl.value=''; notesEl.value=''; if (filesEl) filesEl.value='';
           if (expEditingId) setEditMode(false);
           // Hide the Add Expense section after a successful add when not editing
           if (!expEditingId) {
@@ -618,7 +645,24 @@
 
       if (refs.tableBody) refs.tableBody.addEventListener('click', async (e)=>{
         const toggle = e.target.closest('[data-toggle="details"]');
-        if (toggle) { const tid = toggle.dataset.id; const row = document.getElementById('exp-details-'+tid); if(row) row.classList.toggle('hidden'); return; }
+        if (toggle) {
+          const tid = toggle.dataset.id;
+          const row = document.getElementById('exp-details-'+tid);
+          if (!row) return;
+          const willShow = row.classList.contains('hidden');
+          row.classList.toggle('hidden');
+          if (willShow) {
+            try {
+              await ensureApi();
+              const atts = await API.attachments.list('expenses', tid);
+              const list = document.getElementById('exp-att-list-'+tid);
+              if (list) {
+                list.innerHTML = (atts||[]).map(a => `<li><a class="text-blue-300 hover:underline" href="${a.url}" target="_blank" rel="noopener">${a.name}</a> <span class="text-slate-400 text-xs">(${a.size||0} bytes)</span></li>`).join('') || '<li class="text-slate-400 list-none">No attachments</li>';
+              }
+            } catch (err) { console.error(err); }
+          }
+          return;
+        }
         const btn = e.target.closest('button[data-action]'); if(!btn) return;
         const id = btn.dataset.id; const action = btn.dataset.action;
         if (action==='delete'){
@@ -643,6 +687,7 @@
             if(orderEl) orderEl.value = rec.orderNumber||'';
             if(totalEl) totalEl.value = String(rec.total||0);
             if(notesEl) notesEl.value = rec.notes||'';
+            const paidFromEl = document.getElementById('expPaidFrom'); if (paidFromEl) paidFromEl.value = rec.paidFrom||'';
             expEditingId = id;
             setEditMode(true);
           }catch(err){ console.error(err); }

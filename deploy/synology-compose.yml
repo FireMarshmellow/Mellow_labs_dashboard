@@ -9,6 +9,7 @@ services:
     environment:
       - PORT=3000
       - DATABASE_PATH=/data/finance.db
+      - UPLOADS_DIR=/data/uploads
       - APP_VERSION=${APP_VERSION:-latest}
     volumes:
       - ${HOST_DATA_PATH:-./data}:/data
