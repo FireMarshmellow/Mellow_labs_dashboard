@@ -94,8 +94,17 @@
         </div>
       </div>
     </div>
-  </main>
+    <section class="bg-slate-900/60 border border-rose-800/40 p-6 rounded-2xl shadow-lg space-y-4">
+      <div>
+        <h3 class="text-lg font-semibold text-rose-400">Factory Reset</h3>
+        <p class="text-sm text-slate-300">Wipes <strong>all</strong> income, expenses, payroll, and attachments. This cannot be undone.</p>
+      </div>
+      <button id="btnFactoryReset" class="button-hover px-4 py-2 rounded-lg bg-rose-700 hover:bg-rose-600 text-sm font-semibold">Delete Everything</button>
+      <p id="factoryResetMsg" class="text-xs text-slate-400"></p>
+    </section>
 
+
+  </main>
   <script>
     function updateStatus(connected){ const el=document.getElementById('apiStatus'); if(!el) return; el.textContent = connected?'Connected':'Offline'; el.className = connected?'text-green-400':'text-rose-400'; }
     async function ensureAPI(){ try{ if(!window.API) return false; const ok = API.available || await API.init(''); updateStatus(ok); return ok; } catch { updateStatus(false); return false; } }
@@ -129,7 +138,35 @@
     document.getElementById('btnExportExpenses').addEventListener('click', async ()=>{ if(!(await ensureAPI())) return alert('Backend offline'); const blob = await API.expenses.export(); downloadBlob(blob, `expenses-${new Date().toISOString().slice(0,10)}.csv`); });
     document.getElementById('btnExportPayroll').addEventListener('click', async ()=>{ if(!(await ensureAPI())) return alert('Backend offline'); const blob = await API.payroll.export(); downloadBlob(blob, `payroll-${new Date().toISOString().slice(0,10)}.csv`); });
 
-    (async ()=>{ showVersion(); await ensureAPI(); })();
+
+    const resetBtn = document.getElementById('btnFactoryReset');
+    const resetMsg = document.getElementById('factoryResetMsg');
+    function setFactoryResetMsg(text, ok){ if(!resetMsg) return; resetMsg.textContent = text||''; resetMsg.className = 'text-xs ' + (ok ? 'text-emerald-300' : 'text-amber-300'); }
+    if (resetBtn) {
+      resetBtn.addEventListener('click', async () => {
+        if (!confirm('This will permanently delete all data. Continue?')) return;
+        const token = prompt('Type RESET to confirm.');
+        if (!token || token.trim().toUpperCase() !== 'RESET') { setFactoryResetMsg('Factory reset cancelled.', false); return; }
+        try {
+          if (!(await ensureAPI())) return alert('Backend offline');
+          setFactoryResetMsg('Deleting data...', false);
+          const res = await fetch('/api/factory-reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
+          if (!res.ok) {
+            let err='Factory reset failed.';
+            try { const body = await res.json(); if (body?.error) err = body.error; } catch {}
+            setFactoryResetMsg(err, false);
+            return;
+          }
+          setFactoryResetMsg('All data deleted. Reloading…', true);
+          setTimeout(() => location.reload(), 1200);
+        } catch (err) {
+          console.error(err);
+          setFactoryResetMsg('Factory reset failed. Check console.', false);
+        }
+      });
+    }
+
+        (async ()=>{ showVersion(); await ensureAPI(); })();
   </script>
 </body>
 </html>

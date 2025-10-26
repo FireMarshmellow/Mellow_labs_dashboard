@@ -129,9 +129,16 @@
           Total
           <input id="expTotal" type="number" step="0.01" min="0" placeholder="0.00" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
         </label>
+        <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1">
+          Delivery Fee
+          <input id="expDeliveryFee" type="number" step="0.01" min="0" placeholder="0.00" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+        </label>
         <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-3">
           Paid From
-          <input id="expPaidFrom" type="text" placeholder="e.g. Tomasz Burzy Personal" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm" />
+          <select id="expPaidFrom" class="px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-700 text-sm">
+            <option value="Business Account">Business Account</option>
+            <option value="Tomasz Burzy Personal">Tomasz Burzy Personal</option>
+          </select>
         </label>
         <label class="text-xs text-slate-300 uppercase tracking-wide flex flex-col gap-1 md:col-span-3">
           Notes
@@ -282,6 +289,7 @@
         category: rec.category || 'Uncategorised',
         seller: rec.seller || rec.source || 'Unknown',
         source: rec.source || rec.seller || '',
+        deliveryFee: Number(rec.deliveryFee || rec.delivery_fee || 0),
         paidFrom: rec.paidFrom || rec.paid_from || '',
         items: rec.items || '',
         orderNumber: rec.orderNumber || '',
@@ -343,7 +351,7 @@
         if (start && d < start) return false;
         if (end && d > end) return false;
         if (!q) return true;
-        const haystack = [rec.category, rec.seller, rec.items, rec.notes, rec.orderNumber, rec.paidFrom].join(' ').toLowerCase();
+        const haystack = [rec.category, rec.seller, rec.items, rec.notes, rec.orderNumber, rec.paidFrom, rec.deliveryFee].join(' ').toLowerCase();
         return haystack.includes(q);
       });
 
@@ -511,6 +519,7 @@
             <div><span class="text-slate-400">Order #:</span> <span class="text-slate-200">${rec.orderNumber||'N/A'}</span></div>
             <div><span class="text-slate-400">Source:</span> <span class="text-slate-200">${rec.source||'N/A'}</span></div>
             <div><span class="text-slate-400">Paid From:</span> <span class="text-slate-200">${rec.paidFrom||'N/A'}</span></div>
+            <div><span class="text-slate-400">Delivery Fee:</span> <span class="text-slate-200">${gbp.format(rec.deliveryFee || 0)}</span></div>
             <div class="md:col-span-1 md:col-start-4 text-right">
               <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-action="edit" data-id="${rec.id}">Edit</button>
               <button class="ml-2 px-2 py-1 rounded bg-rose-600 hover:bg-rose-500 text-xs" data-action="delete" data-id="${rec.id}">Delete</button>
@@ -536,9 +545,11 @@
       const itemsEl = document.getElementById('expItems');
       const orderEl = document.getElementById('expOrder');
       const totalEl = document.getElementById('expTotal');
+      const deliveryFeeEl = document.getElementById('expDeliveryFee');
       const paidFromEl = document.getElementById('expPaidFrom');
       const notesEl = document.getElementById('expNotes');
-      if (paidFromEl && !paidFromEl.value) paidFromEl.value = 'Tomasz Burzy Personal';
+      if (paidFromEl) paidFromEl.value = ensurePaidFromOption(paidFromEl.value || 'Business Account');
+      if (deliveryFeeEl) deliveryFeeEl.value = '';
       const filesEl = document.getElementById('expFiles');
       const addBtn = document.getElementById('btnAddExpense');
       const cancelBtn = document.getElementById('btnCancelExpenseEdit');
@@ -584,6 +595,19 @@
       populateSelect(categorySel, unique([ ...defaults.categories, ...loadList(STORAGE.categories) ]), categoryCustomEl);
       populateSelect(sourceSel, unique([ ...defaults.sources, ...loadList(STORAGE.sources) ]), sourceCustomEl);
 
+      function ensurePaidFromOption(value){
+        if (!paidFromEl) return 'Business Account';
+        const target = (value || 'Business Account').trim() || 'Business Account';
+        const options = Array.from(paidFromEl.options || []);
+        const match = options.find(opt => (opt.value||'').toLowerCase() === target.toLowerCase());
+        if (match) return match.value;
+        const opt = document.createElement('option');
+        opt.value = target;
+        opt.textContent = target;
+        paidFromEl.appendChild(opt);
+        return target;
+      }
+
       function setMsg(t, ok){ if(!msgEl) return; msgEl.textContent = t||''; msgEl.className = 'text-xs ' + (ok ? 'text-emerald-300' : 'text-amber-300'); }
       function setEditMode(on){
         if (!addBtn || !cancelBtn) return;
@@ -601,14 +625,15 @@
           const items = (itemsEl?.value||'').trim();
           const orderNumber = (orderEl?.value||'').trim();
           const total = Number(totalEl?.value||0);
+          const deliveryFee = Number(deliveryFeeEl?.value||0);
           const notes = (notesEl?.value||'').trim();
-          const paidFrom = (paidFromEl?.value||'').trim();
+          const paidFrom = ensurePaidFromOption(paidFromEl?.value);
           if(!date) return setMsg('Please select a date', false);
           if(!isFinite(total) || total<=0) return setMsg('Total must be greater than 0', false);
           const source = (sourceSel?.value==='__custom' ? (sourceCustomEl?.value||'').trim() : (sourceSel?.value||'').trim());
           if (categorySel?.value==='__custom' && !category) return setMsg('Enter a custom category', false);
           if (sourceSel?.value==='__custom' && !source) return setMsg('Enter a custom source', false);
-          const payload = expEditingId ? { id: expEditingId, date, category, seller, items, orderNumber, total, notes, source, paidFrom } : { date, category, seller, items, orderNumber, total, notes, source, paidFrom };
+          const payload = expEditingId ? { id: expEditingId, date, category, seller, items, orderNumber, total, deliveryFee, notes, source, paidFrom } : { date, category, seller, items, orderNumber, total, deliveryFee, notes, source, paidFrom };
           const saved = await API.expenses.upsert(payload);
           setMsg(expEditingId ? 'Expense updated.' : 'Expense added.', true);
 
@@ -631,7 +656,7 @@
           if (refs.endDate.value && new Date(refs.endDate.value) < d) refs.endDate.valueAsDate = d;
           applyFilters();
           // clear light fields
-          totalEl.value=''; notesEl.value=''; if (filesEl) filesEl.value='';
+          totalEl.value=''; if (deliveryFeeEl) deliveryFeeEl.value=''; notesEl.value=''; if (filesEl) filesEl.value='';
           if (expEditingId) setEditMode(false);
           // Hide the Add Expense section after a successful add when not editing
           if (!expEditingId) {
@@ -686,8 +711,10 @@
             if(itemsEl) itemsEl.value = rec.items||'';
             if(orderEl) orderEl.value = rec.orderNumber||'';
             if(totalEl) totalEl.value = String(rec.total||0);
+            if(deliveryFeeEl) deliveryFeeEl.value = String(rec.deliveryFee||0);
             if(notesEl) notesEl.value = rec.notes||'';
-            const paidFromEl = document.getElementById('expPaidFrom'); if (paidFromEl) paidFromEl.value = rec.paidFrom||'';
+            const paidVal = ensurePaidFromOption(rec.paidFrom||'');
+            if (paidFromEl) paidFromEl.value = paidVal;
             expEditingId = id;
             setEditMode(true);
           }catch(err){ console.error(err); }

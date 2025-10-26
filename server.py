@@ -1,6 +1,7 @@
 import csv
 import io
 import os
+import shutil
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
@@ -57,6 +58,7 @@ def init_db():
             notes TEXT,
             source TEXT,
             paid_from TEXT,
+            delivery_fee REAL DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
@@ -87,18 +89,21 @@ def init_db():
     db.commit()
     # Migrations for existing databases
     try:
-        # Add paid_from to expenses if missing
         cols = {r[1] for r in db.execute("PRAGMA table_info(expenses)").fetchall()}
         if "paid_from" not in cols:
             db.execute("ALTER TABLE expenses ADD COLUMN paid_from TEXT")
-            db.commit()
+        if "delivery_fee" not in cols:
+            db.execute("ALTER TABLE expenses ADD COLUMN delivery_fee REAL DEFAULT 0")
+        db.commit()
     except Exception:
         pass
-    # Backfill default value for paid_from if empty
     try:
         db.execute(
             "UPDATE expenses SET paid_from = ? WHERE paid_from IS NULL OR paid_from = ''",
             ("Tomasz Burzy Personal",),
+        )
+        db.execute(
+            "UPDATE expenses SET delivery_fee = 0 WHERE delivery_fee IS NULL",
         )
         db.commit()
     except Exception:
@@ -118,6 +123,12 @@ def _ensure_record_dir(kind: str, record_id: str) -> Path:
     path = UPLOAD_DIR / kind / record_id
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _remove_record_dir(kind: str, record_id: str):
+    path = UPLOAD_DIR / kind / record_id
+    if path.exists() and path.is_dir():
+        shutil.rmtree(path, ignore_errors=True)
 
 
 def _attachment_row_to_dict(row: sqlite3.Row) -> dict:
@@ -181,6 +192,7 @@ RESOURCE_CONFIG = {
             "notes",
             "source",
             "paid_from",
+            "delivery_fee",
         ],
         "to_db": lambda payload: {
             "id": str(payload.get("id") or generate_id()),
@@ -193,6 +205,7 @@ RESOURCE_CONFIG = {
             "notes": (payload.get("notes") or "").strip(),
             "source": (payload.get("source") or "").strip(),
             "paid_from": (payload.get("paidFrom") or payload.get("paid_from") or "").strip(),
+            "delivery_fee": float(payload.get("deliveryFee") or payload.get("delivery_fee") or 0),
         },
         "from_db": lambda row: {
             "id": row["id"],
@@ -205,8 +218,9 @@ RESOURCE_CONFIG = {
             "notes": row["notes"] or "",
             "source": row["source"] or "",
             "paidFrom": row["paid_from"] or "",
+            "deliveryFee": float(row["delivery_fee"] or 0),
         },
-        "csv_header": ["Date", "Category", "Seller", "Item(s)", "Order #", "TotalGBP", "Notes", "Source", "Paid From"],
+        "csv_header": ["Date", "Category", "Seller", "Item(s)", "Order #", "TotalGBP", "DeliveryFeeGBP", "Notes", "Source", "Paid From"],
         "csv_row": lambda rec: [
             rec["date"],
             rec["category"],
@@ -214,6 +228,7 @@ RESOURCE_CONFIG = {
             rec["items"],
             rec["orderNumber"],
             f'{rec["total"]:.2f}',
+            f'{float(rec.get("deliveryFee", 0) or 0):.2f}',
             rec["notes"],
             rec["source"],
             rec.get("paidFrom", ""),
@@ -379,22 +394,7 @@ def delete_record(kind: str, record_id: str):
     deleted = result.rowcount > 0
     # If a record was deleted, also remove its attachments (DB + files)
     if deleted and kind in ("income", "expenses"):
-        try:
-            # remove files on disk
-            base = UPLOAD_DIR / kind / record_id
-            if base.exists() and base.is_dir():
-                for p in base.iterdir():
-                    try:
-                        if p.is_file():
-                            p.unlink(missing_ok=True)  # type: ignore[arg-type]
-                    except Exception:
-                        pass
-                try:
-                    base.rmdir()
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        _remove_record_dir(kind, record_id)
         db.execute("DELETE FROM attachments WHERE kind = ? AND record_id = ?", (kind, record_id))
     db.commit()
     return deleted
@@ -404,6 +404,9 @@ def clear_records(kind: str):
     config = RESOURCE_CONFIG[kind]
     db = get_db()
     db.execute(f"DELETE FROM {config['table']}")
+    if kind in ("income", "expenses"):
+        db.execute("DELETE FROM attachments WHERE kind = ?", (kind,))
+        shutil.rmtree(UPLOAD_DIR / kind, ignore_errors=True)
     db.commit()
 
 
@@ -416,6 +419,30 @@ def export_csv(kind: str) -> str:
     for record in records:
         writer.writerow(config["csv_row"](record))
     return output.getvalue()
+
+
+
+
+"""Factory reset helpers"""
+
+
+def factory_reset():
+    db = get_db()
+    for cfg in RESOURCE_CONFIG.values():
+        db.execute(f"DELETE FROM {cfg['table']}")
+    db.execute("DELETE FROM attachments")
+    db.commit()
+    shutil.rmtree(UPLOAD_DIR, ignore_errors=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@app.route("/api/factory-reset", methods=["POST"])
+def api_factory_reset():
+    payload = request.get_json(silent=True) or {}
+    if not payload.get("confirm"):
+        return jsonify({"error": "Confirmation required"}), 400
+    factory_reset()
+    return jsonify({"reset": True})
 
 
 @app.route("/api/version")
