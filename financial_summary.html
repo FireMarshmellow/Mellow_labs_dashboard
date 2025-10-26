@@ -79,7 +79,7 @@
             <option value="3m">Last 3 Months</option>
             <option value="6m">Last 6 Months</option>
             <option value="1y">Last Year</option>
-            <option value="all">All Time</option>
+            <option value="all" selected>All Time</option>
           </select>
         </div>
         <button id="updateCharts" class="button-hover px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm">Update Charts</button>
@@ -927,8 +927,8 @@
       await loadData();
       if (!timelineChart) initCharts();
       const quick = document.getElementById('quickSelect');
-      if (quick) quick.value = '7d';
-      setQuickSelectDates('7d');
+      if (quick) quick.value = 'all';
+      setQuickSelectDates('all');
       updateCharts();
       updateTables();
       updateApiStatus(state.apiConnected);
