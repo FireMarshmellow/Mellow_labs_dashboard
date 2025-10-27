@@ -168,7 +168,50 @@
     }
     function procPayrollCSV(csv){ const rows=parseCSV(csv); if(rows.length<2) return []; const h=rows[0].map(x=>x.trim().toLowerCase()); const i={date:h.indexOf('date'), employee:h.indexOf('employee'), amount:h.findIndex(x=>x.includes('amount')||x.includes('net')), notes:h.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; const date=toISODate(row[i.date]); const employee=row[i.employee]||''; if(!date||!employee) continue; out.push({ id: Math.random().toString(36).slice(2)+Date.now().toString(36), date, employee, amount: Number(String(row[i.amount]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[i.notes]||'' }); } return out; }
 
-    async function importGeneric(kind, records, keyFn){ if(!records.length) return 0; if(!(await ensureAPI())) throw new Error('Backend offline'); const existing = await API[kind].list(); const seen = new Set(existing.map(keyFn)); let added=0; for(const rec of records){ if(!seen.has(keyFn(rec))){ await API[kind].upsert(rec); seen.add(keyFn(rec)); added++; } } return added; }
+    async function importGeneric(kind, records, keyFn){
+      if(!records.length) return 0;
+      if(!(await ensureAPI())) throw new Error('Backend offline');
+      const existing = await API[kind].list();
+      const byKey = new Map(existing.map(rec => [keyFn(rec), rec]));
+      let added=0;
+      for(const rec of records){
+        const key = keyFn(rec);
+        const current = byKey.get(key);
+        if(!current){
+          const stored = await API[kind].upsert(rec);
+          byKey.set(key, stored);
+          added++;
+          continue;
+        }
+        const merged = Object.assign({}, current);
+        let changed = false;
+        for(const [field, value] of Object.entries(rec)){
+          if(value===undefined || value===null) continue;
+          if(typeof value === 'number'){
+            if(Number.isNaN(value)) continue;
+            const curNum = typeof merged[field] === 'number' ? merged[field] : Number(merged[field]||0);
+            if(curNum !== value){
+              merged[field] = value;
+              changed = true;
+            }
+            continue;
+          }
+          const newVal = String(value).trim();
+          const curVal = merged[field];
+          const curStr = curVal==null ? '' : String(curVal).trim();
+          if(newVal && curStr !== newVal){
+            merged[field] = value;
+            changed = true;
+          }
+        }
+        if(changed){
+          const stored = await API[kind].upsert(merged);
+          byKey.set(key, stored);
+          added++;
+        }
+      }
+      return added;
+    }
 
     document.getElementById('settingsIncomeImport').addEventListener('change', async e=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ try{ const items=procIncomeCSV(String(r.result||'')); const added=await importGeneric('income', items, x=>[x.date,(x.source||'').toLowerCase(),Number(x.amount||0).toFixed(2),Number(x.fees||0).toFixed(2)].join('|')); alert(`Imported ${added} income record(s)`);} catch(err){ console.error(err); alert('Import failed'); } finally { e.target.value=''; } }; r.readAsText(f); });
     document.getElementById('settingsExpensesImport').addEventListener('change', async e=>{ const f=e.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=async ()=>{ try{ const items=procExpenseCSV(String(r.result||'')); const added=await importGeneric('expenses', items, x=>[x.date,(x.seller||x.source||'').toLowerCase(),Number(x.total||0).toFixed(2),(x.orderNumber||'').toLowerCase()].join('|')); alert(`Imported ${added} expense record(s)`);} catch(err){ console.error(err); alert('Import failed'); } finally { e.target.value=''; } }; r.readAsText(f); });
