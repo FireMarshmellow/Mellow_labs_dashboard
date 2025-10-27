@@ -125,7 +125,47 @@
     function parseCSV(text){ const rows=[]; let i=0,field='',row=[],inQ=false; while(i<text.length){ const ch=text[i++]; if(inQ){ if(ch==='"'){ if(text[i]==='"'){ field+='"'; i++; } else inQ=false; } else field+=ch; } else { if(ch==='"') inQ=true; else if(ch===','){ row.push(field); field=''; } else if(ch==='\n'||ch==='\r'){ if(field!==''||row.length){ row.push(field); rows.push(row); row=[]; field=''; } } else field+=ch; } } if(field!==''||row.length){ row.push(field); rows.push(row);} return rows.filter(r=>r.length>1);}    
     function toISODate(s){ if(!s) return ''; const v=String(s).trim(); const c=['yyyy-MM-dd','dd/MM/yyyy','MM/dd/yyyy','dd-MM-yyyy','yyyy/MM/dd']; let dt=luxon.DateTime.fromISO(v); if(!dt.isValid) dt=luxon.DateTime.fromSQL(v); for(const f of c){ if(dt.isValid) break; dt=luxon.DateTime.fromFormat(v,f);} return dt.isValid? dt.toISODate():''; }
     function procIncomeCSV(csv){ const rows=parseCSV(csv); if(rows.length<2) return []; const h=rows[0].map(x=>x.trim().toLowerCase()); const i={date:h.indexOf('date'), source:h.indexOf('source'), processor:h.indexOf('processor'), amount:h.findIndex(x=>x.includes('amount')), fees:h.findIndex(x=>x.includes('fee')), notes:h.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; const date=toISODate(row[i.date]); if(!date) continue; out.push({ id: Math.random().toString(36).slice(2)+Date.now().toString(36), date, source: row[i.source]||'', processor: row[i.processor]||'', amount: Number(String(row[i.amount]||'0').replace(/[^0-9.\-]/g,''))||0, fees: Number(String(row[i.fees]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[i.notes]||'' }); } return out; }
-    function procExpenseCSV(csv){ const rows=parseCSV(csv); if(rows.length<2) return []; const h=rows[0].map(x=>x.trim().toLowerCase()); const i={date:h.indexOf('date'), category:h.indexOf('category'), seller:h.indexOf('seller'), source:h.indexOf('source'), items:h.findIndex(x=>x.includes('item')), order:h.findIndex(x=>x.startsWith('order')), total:h.findIndex(x=>x.includes('total')||x.includes('amount')), notes:h.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; const date=toISODate(row[i.date]); if(!date) continue; out.push({ id: Math.random().toString(36).slice(2)+Date.now().toString(36), date, category: row[i.category]||'Imported', seller: row[i.seller]||row[i.source]||'', items: row[i.items]||'', orderNumber: row[i.order]||'', total: Number(String(row[i.total]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[i.notes]||'', source: row[i.source]||row[i.seller]||'' }); } return out; }
+    function procExpenseCSV(csv){
+      const rows=parseCSV(csv); if(rows.length<2) return [];
+      const h=rows[0].map(x=>x.trim().toLowerCase());
+      const i={
+        date:h.indexOf('date'),
+        category:h.indexOf('category'),
+        seller:h.indexOf('seller'),
+        source:h.indexOf('source'),
+        items:h.findIndex(x=>x.includes('item')),
+        order:h.findIndex(x=>x.startsWith('order')),
+        total:h.findIndex(x=>x.includes('total')||x.includes('amount')),
+        notes:h.indexOf('notes'),
+        delivery:h.findIndex(x=>x.includes('delivery')&&(x.includes('fee')||x.includes('cost'))),
+        paidFrom:h.findIndex(x=>x.includes('paid')&&x.includes('from'))
+      };
+      const out=[];
+      for(let r=1;r<rows.length;r++){
+        const row=rows[r];
+        const date=toISODate(row[i.date]);
+        if(!date) continue;
+        const total=Number(String(i.total!==-1?row[i.total]||'0':'0').replace(/[^0-9.\-]/g,''))||0;
+        const deliveryFee=Number(String(i.delivery!==-1?row[i.delivery]||'0':'0').replace(/[^0-9.\-]/g,''))||0;
+        const sourceVal=i.source!==-1?(row[i.source]||'').trim():'';
+        const sellerVal=i.seller!==-1?(row[i.seller]||'').trim():'';
+        const paidFromVal=i.paidFrom!==-1?(row[i.paidFrom]||'').trim():'';
+        out.push({
+          id:Math.random().toString(36).slice(2)+Date.now().toString(36),
+          date,
+          category:i.category!==-1?(row[i.category]||'Imported'):'Imported',
+          seller:sellerVal||sourceVal||'',
+          items:i.items!==-1?(row[i.items]||''):'',
+          orderNumber:i.order!==-1?(row[i.order]||''):'',
+          total,
+          deliveryFee,
+          notes:i.notes!==-1?(row[i.notes]||''):'',
+          source:sourceVal||sellerVal||'',
+          paidFrom:paidFromVal||''
+        });
+      }
+      return out;
+    }
     function procPayrollCSV(csv){ const rows=parseCSV(csv); if(rows.length<2) return []; const h=rows[0].map(x=>x.trim().toLowerCase()); const i={date:h.indexOf('date'), employee:h.indexOf('employee'), amount:h.findIndex(x=>x.includes('amount')||x.includes('net')), notes:h.indexOf('notes')}; const out=[]; for(let r=1;r<rows.length;r++){ const row=rows[r]; const date=toISODate(row[i.date]); const employee=row[i.employee]||''; if(!date||!employee) continue; out.push({ id: Math.random().toString(36).slice(2)+Date.now().toString(36), date, employee, amount: Number(String(row[i.amount]||'0').replace(/[^0-9.\-]/g,''))||0, notes: row[i.notes]||'' }); } return out; }
 
     async function importGeneric(kind, records, keyFn){ if(!records.length) return 0; if(!(await ensureAPI())) throw new Error('Backend offline'); const existing = await API[kind].list(); const seen = new Set(existing.map(keyFn)); let added=0; for(const rec of records){ if(!seen.has(keyFn(rec))){ await API[kind].upsert(rec); seen.add(keyFn(rec)); added++; } } return added; }
