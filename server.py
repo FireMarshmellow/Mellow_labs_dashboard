@@ -344,6 +344,19 @@ def get_attachment(att_id: str):
     return row
 
 
+def get_attachment_by_storage(kind: str, record_id: str, stored_name: str):
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT id, kind, record_id, original_name, stored_name, mime_type, size, created_at
+        FROM attachments
+        WHERE kind = ? AND record_id = ? AND stored_name = ?
+        """,
+        (kind, record_id, stored_name),
+    ).fetchone()
+    return row
+
+
 def delete_attachment(att_id: str) -> bool:
     row = get_attachment(att_id)
     if not row:
@@ -533,6 +546,30 @@ def attachments_download(att_id):
     try:
         disp = f"inline; filename={row['original_name']}"
         resp.headers["Content-Disposition"] = disp
+    except Exception:
+        pass
+    return resp
+
+
+@app.route("/uploads/<kind>/<record_id>/<filename>")
+def serve_upload(kind, record_id, filename):
+    if kind not in ("income", "expenses"):
+        return jsonify({"error": "Not found"}), 404
+    row = get_attachment_by_storage(kind, record_id, filename)
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    base = UPLOAD_DIR.resolve()
+    target = (base / kind / record_id / filename).resolve()
+    if base not in target.parents:
+        return jsonify({"error": "Not found"}), 404
+    if not target.exists() or not target.is_file():
+        return jsonify({"error": "Not found"}), 404
+    resp = send_from_directory(target.parent, target.name)
+    mime = row["mime_type"]
+    if mime:
+        resp.headers.setdefault("Content-Type", mime)
+    try:
+        resp.headers.setdefault("Content-Disposition", f"inline; filename={row['original_name']}")
     except Exception:
         pass
     return resp
