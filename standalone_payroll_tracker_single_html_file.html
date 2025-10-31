@@ -189,7 +189,7 @@
 
   <script>
     const gbp = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
-    const state = { all: [], filtered: [] };
+    const state = { all: [], filtered: [], offsets: [], rawPayroll: [] };
 
     const refs = {
       startDate: document.getElementById('startDate'),
@@ -218,6 +218,30 @@
       };
     }
 
+    const PERSONAL_PAID_FROM_KEY = 'tomasz burzy personal';
+    const PERSONAL_PAYROLL_EMPLOYEE = 'Tomasz burzy';
+
+    function buildPersonalPayrollOffsets(expenses) {
+      if (!Array.isArray(expenses) || !expenses.length) return [];
+      const offsets = [];
+      expenses.forEach((exp, idx) => {
+        const paidFrom = String(exp?.paidFrom || exp?.paid_from || '').trim().toLowerCase();
+        if (paidFrom !== PERSONAL_PAID_FROM_KEY) return;
+        const amount = Number(exp?.total ?? exp?.price ?? exp?.amount ?? 0);
+        if (!amount) return;
+        const detail = exp?.items || exp?.category || exp?.seller || exp?.source || '';
+        offsets.push({
+          id: `offset-${exp?.id || `${exp?.date || 'unknown'}-${idx}`}`,
+          date: exp?.date || '',
+          employee: PERSONAL_PAYROLL_EMPLOYEE,
+          amount: -amount,
+          notes: detail ? `Expense offset: ${detail}` : 'Expense offset (personal funds)',
+          _isOffset: true,
+        });
+      });
+      return offsets;
+    }
+
     async function ensureApi() {
       if (!window.API) throw new Error('API helper missing');
       if (!API.available) await API.init('');
@@ -226,8 +250,17 @@
 
     async function loadData() {
       await ensureApi();
-      const data = await API.payroll.list();
-      state.all = data.map(mapRecord);
+      const [payrollRes, expenseRes] = await Promise.allSettled([
+        API.payroll.list(),
+        API.expenses.list()
+      ]);
+      const payroll = payrollRes.status === 'fulfilled' ? payrollRes.value : [];
+      const expenses = expenseRes.status === 'fulfilled' ? expenseRes.value : [];
+      const payrollRecords = (payroll || []).map(mapRecord);
+      const offsets = buildPersonalPayrollOffsets(expenses || []);
+      state.rawPayroll = payrollRecords;
+      state.offsets = offsets;
+      state.all = payrollRecords.concat(offsets);
     }
 
     function setQuickRange(value) {
@@ -296,11 +329,16 @@
       const avg = state.filtered.length ? total / state.filtered.length : 0;
       const largest = state.filtered.reduce((max, rec) => Math.max(max, rec.amount), 0);
       const employees = new Set(state.filtered.map(rec => rec.employee)).size;
+      const offsetTotal = state.filtered.filter(rec => rec._isOffset).reduce((sum, rec) => sum + rec.amount, 0);
 
       refs.statTotal.textContent = gbp.format(total);
       refs.statAverage.textContent = gbp.format(avg);
       refs.statLargest.textContent = gbp.format(largest);
       refs.statEmployees.textContent = employees.toString();
+      if (refs.statTotal) {
+        if (offsetTotal) refs.statTotal.title = `Includes ${gbp.format(Math.abs(offsetTotal))} offset from personal expenses`;
+        else refs.statTotal.removeAttribute('title');
+      }
     }
 
     function updateCharts() {
@@ -325,12 +363,14 @@
     // Compact rows + expandable details
     function renderTable() {
       refs.summary.textContent = `Showing ${state.filtered.length} entr${state.filtered.length === 1 ? 'y' : 'ies'}`;
-      refs.tableBody.innerHTML = state.filtered.map(rec => `
+      refs.tableBody.innerHTML = state.filtered.map(rec => {
+        const amountClass = rec.amount >= 0 ? 'text-blue-300' : 'text-rose-300';
+        return `
         <tr class="transition-colors" data-row-id="${rec.id}">
           <td class="py-3 px-3"><button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" data-toggle="details" data-id="${rec.id}">Details</button></td>
           <td class="py-3 px-3 whitespace-nowrap text-slate-200">${rec.date}</td>
           <td class="py-3 px-3 text-slate-100">${rec.employee}</td>
-          <td class="py-3 px-3 text-right text-blue-300 font-medium">${gbp.format(rec.amount)}</td>
+          <td class="py-3 px-3 text-right ${amountClass} font-medium">${gbp.format(rec.amount)}</td>
         </tr>
         <tr id="pay-details-${rec.id}" class="hidden bg-slate-800/40"><td colspan="4" class="px-3 py-3">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
@@ -341,7 +381,8 @@
             </div>
           </div>
         </td></tr>
-      `).join('');
+      `;
+      }).join('');
     }
 
     function initCharts() {

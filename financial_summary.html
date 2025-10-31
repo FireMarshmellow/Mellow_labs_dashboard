@@ -220,6 +220,7 @@
               <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="payroll-date">Date</th>
               <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50" data-sort="payroll-employee">Employee</th>
               <th class="px-4 py-2 cursor-pointer hover:bg-slate-600/50 text-right" data-sort="payroll-amount">Amount</th>
+              <th class="px-4 py-2">Notes</th>
             </tr>
           </thead>
           <tbody id="payrollTable" class="divide-y divide-slate-700/30"></tbody>
@@ -412,7 +413,8 @@
     }
 
     function mapExpense(row) {
-      const price = Number(row.total || 0);
+      const price = Number(row.total ?? row.price ?? 0);
+      const deliveryFee = Number(row.deliveryFee ?? row.delivery_fee ?? 0);
       const platform = row.source || row.seller || '';
       return {
         id: row.id,
@@ -422,8 +424,10 @@
         items: row.items || '',
         orderNumber: row.orderNumber || row.order_number || '',
         price,
+        deliveryFee,
         platform,
         source: row.source || '',
+        paidFrom: row.paidFrom || row.paid_from || '',
         notes: row.notes || ''
       };
     }
@@ -524,6 +528,8 @@
       let amountIdx = header.findIndex(h => h.includes('total') || h.includes('amount'));
       const orderIdx = header.findIndex(h => h.startsWith('order'));
       const notesIdx = header.indexOf('notes');
+      const paidFromIdx = header.findIndex(h => h.includes('paid') && h.includes('from'));
+      const deliveryIdx = header.findIndex(h => h.includes('delivery') && (h.includes('fee') || h.includes('cost')));
       return rows.slice(1).map(r => {
         const date = toISODate(r[dateIdx]);
         const total = amountIdx !== -1 ? Number(String(r[amountIdx] || '0').replace(/[^0-9.-]/g, '')) || 0 : 0;
@@ -533,6 +539,8 @@
         const items = itemIdx !== -1 ? (r[itemIdx] || '').trim() : '';
         const orderNumber = orderIdx !== -1 ? (r[orderIdx] || '').trim() : '';
         const notes = notesIdx !== -1 ? (r[notesIdx] || '').trim() : '';
+        const paidFrom = paidFromIdx !== -1 ? (r[paidFromIdx] || '').trim() : '';
+        const deliveryFee = deliveryIdx !== -1 ? Number(String(r[deliveryIdx] || '0').replace(/[^0-9.-]/g, '')) || 0 : 0;
         return {
           date,
           category,
@@ -540,8 +548,10 @@
           items,
           orderNumber,
           total,
+          deliveryFee,
           notes,
-          source: source || seller
+          source: source || seller,
+          paidFrom
         };
       }).filter(rec => rec.date && rec.total);
     }
@@ -564,6 +574,41 @@
           notes: notesIdx !== -1 ? (r[notesIdx] || '').trim() : ''
         };
       }).filter(rec => rec.date && rec.employee && rec.amount);
+    }
+
+    const PERSONAL_PAID_FROM_KEY = 'tomasz burzy personal';
+    const PERSONAL_PAYROLL_EMPLOYEE = 'Tomasz burzy';
+
+    function buildPersonalPayrollOffsets(expenses) {
+      if (!Array.isArray(expenses) || !expenses.length) return [];
+      const offsets = [];
+      expenses.forEach((exp, idx) => {
+        const paidFrom = String(exp?.paidFrom || exp?.source || '').trim().toLowerCase();
+        if (paidFrom !== PERSONAL_PAID_FROM_KEY) return;
+        const amount = Number(exp?.price || 0);
+        if (!amount) return;
+        const date = exp?.date || '';
+        const detail = exp?.items || exp?.category || exp?.platform || '';
+        offsets.push({
+          id: `offset-${exp?.id || `${date || 'unknown'}-${idx}`}`,
+          date,
+          employee: PERSONAL_PAYROLL_EMPLOYEE,
+          amount: -amount,
+          notes: detail ? `Expense offset: ${detail}` : 'Expense offset (personal funds)',
+          _isOffset: true
+        });
+      });
+      return offsets;
+    }
+
+    function mergePayrollWithPersonalOffsets(payrollRecords, expenseRecords) {
+      const base = Array.isArray(payrollRecords) ? payrollRecords.slice() : [];
+      const offsets = buildPersonalPayrollOffsets(expenseRecords);
+      return {
+        records: base.concat(offsets),
+        offsets,
+        offsetTotal: offsets.reduce((sum, entry) => sum + (Number(entry.amount) || 0), 0)
+      };
     }
 
     function filterDataByDateRange(data, startDate, endDate) {
@@ -626,7 +671,8 @@
       const endDate = new Date(document.getElementById('endDate').value);
       const inc = filterDataByDateRange(incomeData, startDate, endDate);
       const exp = filterDataByDateRange(expensesData, startDate, endDate);
-      const pay = filterDataByDateRange(payrollData, startDate, endDate);
+      const basePayroll = filterDataByDateRange(payrollData, startDate, endDate);
+      const { records: pay, offsetTotal } = mergePayrollWithPersonalOffsets(basePayroll, exp);
 
 
       const totalInc = inc.reduce((sum, item) => sum + (Number(item.net ?? item.gross ?? 0)), 0);
@@ -636,7 +682,10 @@
 
       document.getElementById('totalIncome').textContent = gbp.format(totalInc);
       document.getElementById('totalExpenses').textContent = gbp.format(totalExp);
-      document.getElementById('totalPayroll').textContent = gbp.format(totalPayroll);
+      const payrollCard = document.getElementById('totalPayroll');
+      payrollCard.textContent = gbp.format(totalPayroll);
+      if (offsetTotal) payrollCard.title = `Includes ${gbp.format(Math.abs(offsetTotal))} offset from personal expenses`;
+      else payrollCard.removeAttribute('title');
       const netEl = document.getElementById('netIncome');
       netEl.textContent = gbp.format(net);
       netEl.className = 'text-2xl font-bold ' + (net >= 0 ? 'text-green-400' : 'text-rose-400');
@@ -698,8 +747,9 @@
         const key = p.employee || 'Unknown';
         payrollByEmployee[key] = (payrollByEmployee[key] || 0) + Number(p.amount || 0);
       });
-      payrollPieChart.data.labels = Object.keys(payrollByEmployee);
-      payrollPieChart.data.datasets[0].data = Object.values(payrollByEmployee);
+      const payrollPieEntries = Object.entries(payrollByEmployee).filter(([, value]) => value > 0);
+      payrollPieChart.data.labels = payrollPieEntries.map(([name]) => name);
+      payrollPieChart.data.datasets[0].data = payrollPieEntries.map(([, value]) => value);
       payrollPieChart.update();
     }
 
@@ -725,7 +775,9 @@
       const endDate = new Date(document.getElementById('endDate').value);
       const inc = filterDataByDateRange(incomeData, startDate, endDate);
       const exp = filterDataByDateRange(expensesData, startDate, endDate);
-      const pay = filterDataByDateRange(payrollData, startDate, endDate);
+      const basePayroll = filterDataByDateRange(payrollData, startDate, endDate);
+      const { records: payWithOffsets } = mergePayrollWithPersonalOffsets(basePayroll, exp);
+      const pay = payWithOffsets.slice();
 
 
       inc.sort((a, b) => {
@@ -785,13 +837,19 @@
       });
       const payrollTable = document.getElementById('payrollTable');
       if (payrollTable) {
-        payrollTable.innerHTML = pay.map(p => `
+        payrollTable.innerHTML = pay.map(p => {
+          const amount = Number(p.amount || 0);
+          const amountClass = amount >= 0 ? 'text-blue-400' : 'text-rose-400';
+          const note = p.notes || (p._isOffset ? 'Expense offset (personal funds)' : 'N/A');
+          return `
           <tr class="hover:bg-slate-700/30 transition-colors">
             <td class="px-4 py-2">${p.date || ''}</td>
             <td class="px-4 py-2">${p.employee || 'N/A'}</td>
-            <td class="px-4 py-2 text-right text-blue-400">${gbp.format(Number(p.amount || 0))}</td>
+            <td class="px-4 py-2 text-right ${amountClass}">${gbp.format(amount)}</td>
+            <td class="px-4 py-2">${note}</td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
       }
 
       updateSortIndicators();
