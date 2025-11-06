@@ -1,12 +1,17 @@
+import base64
 import csv
 import io
+import json
 import os
+import re
 import shutil
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
+from datetime import datetime
 
 from flask import Flask, jsonify, request, send_from_directory, g, Response
+import requests
 from werkzeug.utils import secure_filename
 
 ROOT = Path(__file__).resolve().parent
@@ -84,6 +89,11 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_attachments_kind_record ON attachments(kind, record_id);
+
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
         """
     )
     db.commit()
@@ -335,6 +345,159 @@ def create_attachments(kind: str, record_id: str, files) -> list:
     return saved
 
 
+def get_all_settings() -> dict:
+    db = get_db()
+    rows = db.execute("SELECT key, value FROM settings").fetchall()
+    return {row["key"]: row["value"] for row in rows}
+
+
+def get_setting(key: str, default=None):
+    if not key:
+        return default
+    db = get_db()
+    row = db.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+def set_setting(key: str, value):
+    if not key:
+        raise ValueError("Setting key required")
+    db = get_db()
+    if value is None:
+        db.execute("DELETE FROM settings WHERE key = ?", (key,))
+    else:
+        text = str(value)
+        if text.strip() == "":
+            db.execute("DELETE FROM settings WHERE key = ?", (key,))
+        else:
+            db.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (key, text),
+            )
+    db.commit()
+
+
+def _stringify(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (list, tuple, set)):
+        parts = []
+        for item in value:
+            if item is None:
+                continue
+            text = str(item).strip()
+            if text:
+                parts.append(text)
+        return ", ".join(parts)
+    if isinstance(value, dict):
+        parts = []
+        for key, val in value.items():
+            if val is None:
+                continue
+            text = str(val).strip()
+            if not text:
+                continue
+            parts.append(f"{key}: {text}")
+        return ", ".join(parts)
+    return str(value).strip()
+
+
+def _extract_json_object(text: str) -> dict:
+    if not text:
+        return {}
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.IGNORECASE)
+    cleaned = cleaned.strip()
+    try:
+        data = json.loads(cleaned)
+        if isinstance(data, dict):
+            return data
+    except json.JSONDecodeError:
+        pass
+    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+    if match:
+        snippet = match.group(0)
+        try:
+            data = json.loads(snippet)
+            if isinstance(data, dict):
+                return data
+        except json.JSONDecodeError:
+            pass
+    raise ValueError("Model response was not valid JSON")
+
+
+def _normalize_date(value: str) -> str:
+    if not value:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    normal = text.replace("Z", "")
+    try:
+        dt = datetime.fromisoformat(normal)
+        return dt.date().isoformat()
+    except ValueError:
+        pass
+    for fmt in (
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%m/%d/%Y",
+        "%d-%m-%Y",
+        "%m-%d-%Y",
+        "%Y/%m/%d",
+        "%d.%m.%Y",
+        "%Y.%m.%d",
+        "%d %b %Y",
+        "%d %B %Y",
+    ):
+        try:
+            dt = datetime.strptime(text, fmt)
+            return dt.date().isoformat()
+        except ValueError:
+            continue
+    # Attempt YYYYMMDD or DDMMYYYY style strings
+    match = re.search(r"(\d{4})[^\d]?(\d{1,2})[^\d]?(\d{1,2})", text)
+    if match:
+        try:
+            return datetime(int(match.group(1)), int(match.group(2)), int(match.group(3))).date().isoformat()
+        except ValueError:
+            pass
+    match = re.search(r"(\d{1,2})[^\d]?(\d{1,2})[^\d]?(\d{2,4})", text)
+    if match:
+        year = int(match.group(3))
+        if year < 100:
+            year += 2000 if year < 50 else 1900
+        try:
+            return datetime(year, int(match.group(1)), int(match.group(2))).date().isoformat()
+        except ValueError:
+            pass
+    return ""
+
+
+def _coerce_amount(value) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return 0.0
+    text = text.replace(",", "")
+    match = re.findall(r"-?\d+(?:\.\d+)?", text)
+    if match:
+        try:
+            return float(match[-1])
+        except ValueError:
+            pass
+    filtered = re.sub(r"[^\d\.\-]", "", text)
+    try:
+        return float(filtered)
+    except ValueError:
+        return 0.0
+
+
 def get_attachment(att_id: str):
     db = get_db()
     row = db.execute(
@@ -444,6 +607,7 @@ def factory_reset():
     for cfg in RESOURCE_CONFIG.values():
         db.execute(f"DELETE FROM {cfg['table']}")
     db.execute("DELETE FROM attachments")
+    db.execute("DELETE FROM settings")
     db.commit()
     shutil.rmtree(UPLOAD_DIR, ignore_errors=True)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -549,6 +713,210 @@ def attachments_download(att_id):
     except Exception:
         pass
     return resp
+
+
+@app.route("/api/settings", methods=["GET"])
+def api_settings():
+    return jsonify({"settings": get_all_settings()})
+
+
+@app.route("/api/settings/<key>", methods=["GET", "PUT", "DELETE"])
+def api_setting_detail(key):
+    norm_key = (key or "").strip()
+    if not norm_key:
+        return jsonify({"error": "Invalid key"}), 400
+    if request.method == "GET":
+        value = get_setting(norm_key, "")
+        return jsonify({"key": norm_key, "value": value or ""})
+    if request.method == "DELETE":
+        set_setting(norm_key, None)
+        return jsonify({"key": norm_key, "value": ""})
+    payload = request.get_json(silent=True) or {}
+    if "value" not in payload:
+        return jsonify({"error": "Missing value"}), 400
+    set_setting(norm_key, payload.get("value"))
+    return jsonify({"key": norm_key, "value": get_setting(norm_key, "") or ""})
+
+
+@app.route("/api/expenses/scan", methods=["POST"])
+def api_expense_scan():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    upload = request.files["file"]
+    if not upload or not upload.filename:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    llm_base = (get_setting("llm_base_url") or "").strip()
+    if not llm_base:
+        return jsonify({"error": "Configure the LLM endpoint in Settings first."}), 400
+    model_name = (get_setting("llm_model") or "").strip() or "receipt-parser"
+    api_key = (get_setting("llm_api_key") or "").strip()
+
+    raw_bytes = upload.read()
+    if not raw_bytes:
+        return jsonify({"error": "Uploaded file was empty."}), 400
+
+    mime = upload.mimetype or "image/jpeg"
+    encoded_image = base64.b64encode(raw_bytes).decode("ascii")
+
+    endpoint = llm_base.rstrip("/") + "/v1/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    system_prompt = (
+        "You extract structured data from receipts and invoices. "
+        "Always respond with a strict JSON object containing the fields: "
+        "date (YYYY-MM-DD), category, seller, items, orderNumber, total, deliveryFee, notes, "
+        "source, paidFrom. Use empty strings when information is missing. "
+        "For totals use numbers (no currency symbols)."
+    )
+    user_prompt = (
+        "Read the supplied receipt image and return the JSON object with the required fields. "
+        "Do not include any explanation or text outside the JSON."
+    )
+    payload_style = (get_setting("llm_payload_style", "auto") or "auto").strip().lower() or "auto"
+    style = payload_style
+    if style == "auto":
+        base_lower = llm_base.lower()
+        if any(tag in base_lower for tag in ("dashscope", "qwen", "aliyun")):
+            style = "qwen"
+        else:
+            style = "openai"
+
+    if style == "qwen":
+        user_blocks = [
+            {"type": "input_text", "text": user_prompt},
+            {"type": "input_image", "image": encoded_image},
+        ]
+    else:
+        # Default to OpenAI-compatible payload
+        user_blocks = [
+            {"type": "text", "text": user_prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{encoded_image}"}},
+        ]
+
+    body = {
+        "model": model_name,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_blocks},
+        ],
+        "temperature": 0.1,
+    }
+
+    try:
+        llm_response = requests.post(endpoint, headers=headers, json=body, timeout=60)
+        llm_response.raise_for_status()
+    except requests.RequestException as exc:
+        return jsonify({"error": f"Failed to contact LLM endpoint: {exc}"}), 502
+
+    try:
+        payload = llm_response.json()
+    except ValueError:
+        return jsonify({"error": "LLM response was not valid JSON payload"}), 502
+
+    message_text = ""
+    if isinstance(payload, dict):
+        choices = payload.get("choices") or []
+        if choices:
+            message_text = choices[0].get("message", {}).get("content") or ""
+    if not message_text:
+        return jsonify({"error": "LLM did not return any content"}), 502
+
+    try:
+        extracted = _extract_json_object(message_text)
+    except ValueError as exc:
+        return jsonify({"error": str(exc), "raw": message_text}), 502
+
+    normalized_payload = {
+        "date": _normalize_date(
+            extracted.get("date")
+            or extracted.get("purchase_date")
+            or extracted.get("transaction_date")
+            or extracted.get("invoice_date")
+        ),
+        "category": (_stringify(extracted.get("category")) or "Imported") or "Imported",
+        "seller": _stringify(
+            extracted.get("seller") or extracted.get("merchant") or extracted.get("vendor")
+        ),
+        "items": _stringify(
+            extracted.get("items")
+            or extracted.get("lineItems")
+            or extracted.get("description")
+        ),
+        "orderNumber": _stringify(
+            extracted.get("orderNumber")
+            or extracted.get("order_number")
+            or extracted.get("invoiceNumber")
+            or extracted.get("reference")
+        ),
+        "total": _coerce_amount(extracted.get("total") or extracted.get("amount")),
+        "deliveryFee": _coerce_amount(
+            extracted.get("deliveryFee") or extracted.get("delivery_fee") or 0
+        ),
+        "notes": _stringify(
+            extracted.get("notes") or extracted.get("additionalNotes") or ""
+        ),
+        "source": _stringify(
+            extracted.get("source") or extracted.get("paymentMethod") or ""
+        ),
+        "paidFrom": _stringify(
+            extracted.get("paidFrom") or extracted.get("account") or ""
+        ),
+    }
+
+    if not normalized_payload["date"]:
+        return (
+            jsonify(
+                {
+                    "error": "Model did not return a usable date.",
+                    "suggested": normalized_payload,
+                    "raw": extracted,
+                }
+            ),
+            422,
+        )
+    if normalized_payload["total"] <= 0:
+        return (
+            jsonify(
+                {
+                    "error": "Model did not return a positive total amount.",
+                    "suggested": normalized_payload,
+                    "raw": extracted,
+                }
+            ),
+            422,
+        )
+
+    try:
+        stored = upsert_record("expenses", normalized_payload)
+    except ValueError as exc:
+        return (
+            jsonify(
+                {
+                    "error": f"Failed to save record: {exc}",
+                    "suggested": normalized_payload,
+                    "raw": extracted,
+                }
+            ),
+            400,
+        )
+
+    try:
+        upload.stream.seek(0)
+    except Exception:
+        upload.stream = io.BytesIO(raw_bytes)
+    attachments = create_attachments("expenses", stored["id"], [upload])
+
+    return jsonify(
+        {
+            "expense": stored,
+            "attachments": attachments,
+            "extracted": extracted,
+            "modelResponse": message_text,
+        }
+    )
 
 
 @app.route("/uploads/<kind>/<record_id>/<filename>")

@@ -160,7 +160,31 @@
     },
 
     income:{ list(){ return API.list('income'); }, upsert(rec){ return API.upsert('income',rec); }, remove(id){ return API.remove('income',id); }, clear(){ return API.clear('income'); }, export(){ return API.export('income'); } },
-    expenses:{ list(){ return API.list('expenses'); }, upsert(rec){ return API.upsert('expenses',rec); }, remove(id){ return API.remove('expenses',id); }, clear(){ return API.clear('expenses'); }, export(){ return API.export('expenses'); } },
+    expenses:{
+      list(){ return API.list('expenses'); },
+      upsert(rec){ return API.upsert('expenses',rec); },
+      remove(id){ return API.remove('expenses',id); },
+      clear(){ return API.clear('expenses'); },
+      export(){ return API.export('expenses'); },
+      async scanReceipt(file){
+        if (!file) throw new Error('No file provided');
+        if (API.mode !== 'server') throw new Error('Receipt scanning requires the backend server');
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(API.base + '/api/expenses/scan', { method: 'POST', body: fd });
+        if (!res.ok) {
+          let msg = `Receipt scan failed (${res.status})`;
+          let detail = null;
+          try { detail = await res.json(); if (detail?.error) msg = detail.error; }
+          catch {}
+          const error = new Error(msg);
+          if (detail) error.details = detail;
+          error.status = res.status;
+          throw error;
+        }
+        return await res.json();
+      }
+    },
     payroll:{ list(){ return API.list('payroll'); }, upsert(rec){ return API.upsert('payroll',rec); }, remove(id){ return API.remove('payroll',id); }, clear(){ return API.clear('payroll'); }, export(){ return API.export('payroll'); } },
 
     attachments: {
@@ -189,6 +213,43 @@
           return r.ok;
         }
         return true;
+      }
+    },
+
+    settings: {
+      async all(){
+        if (API.mode !== 'server') return {};
+        const res = await fetch(API.base + '/api/settings');
+        if (!res.ok) throw new Error('Failed to load settings');
+        const body = await res.json().catch(()=>({}));
+        return body.settings || {};
+      },
+      async get(key){
+        if (API.mode !== 'server') return '';
+        const res = await fetch(API.base + `/api/settings/${encodeURIComponent(key)}`);
+        if (!res.ok) throw new Error('Failed to load setting');
+        const body = await res.json().catch(()=>({}));
+        return body.value ?? '';
+      },
+      async set(key, value){
+        if (API.mode !== 'server') throw new Error('Settings changes require the backend server');
+        const res = await fetch(API.base + `/api/settings/${encodeURIComponent(key)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value })
+        });
+        if (!res.ok) {
+          let msg = `Failed to save setting (${res.status})`;
+          try { const err = await res.json(); if (err?.error) msg = err.error; } catch {}
+          throw new Error(msg);
+        }
+        const body = await res.json().catch(()=>({}));
+        return body.value ?? '';
+      },
+      async remove(key){
+        if (API.mode !== 'server') return true;
+        const res = await fetch(API.base + `/api/settings/${encodeURIComponent(key)}`, { method: 'DELETE' });
+        return res.ok;
       }
     }
   };

@@ -151,6 +151,8 @@
         </label>
         <div class="md:col-span-3 flex items-end gap-2">
           <button id="btnAddExpense" class="button-hover flex-1 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm">Add</button>
+          <button id="btnScanExpense" type="button" class="button-hover px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-sm whitespace-nowrap">Scan Receipt</button>
+          <input id="expScanInput" type="file" accept="image/*" class="hidden" />
           <button id="btnCancelExpenseEdit" class="button-hover px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-sm hidden">Cancel</button>
         </div>
       </div>
@@ -552,6 +554,8 @@
       if (deliveryFeeEl) deliveryFeeEl.value = '';
       const filesEl = document.getElementById('expFiles');
       const addBtn = document.getElementById('btnAddExpense');
+      const scanBtn = document.getElementById('btnScanExpense');
+      const scanInput = document.getElementById('expScanInput');
       const cancelBtn = document.getElementById('btnCancelExpenseEdit');
       const msgEl = document.getElementById('addExpenseMsg');
 
@@ -591,6 +595,15 @@
         else if(customEl){ customEl.classList.add('hidden'); customEl.value=''; }
       }
 
+      function ensureAddSectionVisible(){
+        const addSection = document.getElementById('addExpenseSection');
+        const toggleBtn = document.getElementById('btnToggleAddExpense');
+        if (addSection && addSection.classList.contains('hidden')) {
+          addSection.classList.remove('hidden');
+          if (toggleBtn) toggleBtn.classList.add('ring-2','ring-rose-300');
+        }
+      }
+
       // Initial populate
       populateSelect(categorySel, unique([ ...defaults.categories, ...loadList(STORAGE.categories) ]), categoryCustomEl);
       populateSelect(sourceSel, unique([ ...defaults.sources, ...loadList(STORAGE.sources) ]), sourceCustomEl);
@@ -606,6 +619,31 @@
         opt.textContent = target;
         paidFromEl.appendChild(opt);
         return target;
+      }
+
+      function applySuggestionToForm(data){
+        if(!data) return;
+        ensureAddSectionVisible();
+        if (dateEl) dateEl.value = data.date || '';
+        setSelectValue(categorySel, categoryCustomEl, data.category || '');
+        const sellerVal = data.seller || data.source || '';
+        if (sellerEl) sellerEl.value = sellerVal;
+        setSelectValue(sourceSel, sourceCustomEl, data.source || sellerVal || '');
+        if (itemsEl) itemsEl.value = data.items || '';
+        if (orderEl) orderEl.value = data.orderNumber || data.order_number || '';
+        if (totalEl) {
+          const rawTotal = data.total ?? data.price ?? '';
+          const num = Number(rawTotal);
+          totalEl.value = Number.isFinite(num) && num > 0 ? num.toFixed(2) : (rawTotal ? String(rawTotal) : '');
+        }
+        if (deliveryFeeEl) {
+          const rawDelivery = data.deliveryFee ?? data.delivery_fee ?? '';
+          const num = Number(rawDelivery);
+          deliveryFeeEl.value = Number.isFinite(num) && Math.abs(num) > 0 ? num.toFixed(2) : (rawDelivery ? String(rawDelivery) : '');
+        }
+        if (notesEl) notesEl.value = data.notes || '';
+        const paidVal = ensurePaidFromOption(data.paidFrom || data.paid_from || '');
+        if (paidFromEl) paidFromEl.value = paidVal;
       }
 
       function setMsg(t, ok){ if(!msgEl) return; msgEl.textContent = t||''; msgEl.className = 'text-xs ' + (ok ? 'text-emerald-300' : 'text-amber-300'); }
@@ -668,6 +706,51 @@
         }catch(err){ console.error(err); setMsg('Failed to save expense.', false); }
       });
 
+      if (scanBtn && scanInput) {
+        scanBtn.addEventListener('click', e => {
+          e.preventDefault();
+          scanInput.click();
+        });
+        scanInput.addEventListener('change', async e => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          try{
+            if (expEditingId) setEditMode(false);
+            expEditingId = null;
+            await ensureApi();
+            setMsg('Scanning receipt...', false);
+            const result = await API.expenses.scanReceipt(file);
+            const saved = result?.expense;
+            if (saved && saved.id) {
+              setMsg('Receipt added via AI.', true);
+              await loadData();
+              applyFilters();
+              if (saved.date) {
+                const d = new Date(saved.date);
+                if (refs.startDate.value && new Date(refs.startDate.value) > d) refs.startDate.valueAsDate = d;
+                if (refs.endDate.value && new Date(refs.endDate.value) < d) refs.endDate.valueAsDate = d;
+              }
+              const addSection = document.getElementById('addExpenseSection');
+              const toggleBtn = document.getElementById('btnToggleAddExpense');
+              if (addSection) addSection.classList.add('hidden');
+              if (toggleBtn) toggleBtn.classList.remove('ring-2','ring-rose-300');
+            } else {
+              setMsg('Receipt processed.', true);
+            }
+          } catch (err) {
+            console.error(err);
+            const details = err && err.details ? err.details : null;
+            if (details && details.suggested) {
+              applySuggestionToForm(details.suggested);
+            }
+            const message = (details && details.error) || (err && err.message) || 'Failed to scan receipt.';
+            setMsg(message, false);
+          } finally {
+            scanInput.value = '';
+          }
+        });
+      }
+
       if (refs.tableBody) refs.tableBody.addEventListener('click', async (e)=>{
         const toggle = e.target.closest('[data-toggle="details"]');
         if (toggle) {
@@ -697,13 +780,7 @@
         } else if (action==='edit') {
           const rec = state.all.find(r=>r.id===id); if(!rec) return;
           try{
-            // Ensure Add Expense section is visible when entering edit mode
-            const addSection = document.getElementById('addExpenseSection');
-            const toggleBtn = document.getElementById('btnToggleAddExpense');
-            if (addSection && addSection.classList.contains('hidden')) {
-              addSection.classList.remove('hidden');
-              if (toggleBtn) toggleBtn.classList.add('ring-2','ring-rose-300');
-            }
+            ensureAddSectionVisible();
             if(dateEl) dateEl.value = rec.date||'';
             setSelectValue(categorySel, categoryCustomEl, rec.category||'');
             if(sellerEl) sellerEl.value = rec.seller||'';
